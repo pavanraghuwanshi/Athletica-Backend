@@ -150,7 +150,7 @@ const verifyGoogleIdToken = async (idToken?: string) => {
     throw new AuthError('Google ID token is required', 400)
   }
 
-  if (!env.googleClientId) {
+  if (!env.googleClientIds.length) {
     throw new AuthError('Google sign-in is not configured', 400)
   }
 
@@ -165,7 +165,7 @@ const verifyGoogleIdToken = async (idToken?: string) => {
   const tokenInfo = (await response.json()) as GoogleTokenInfo
   const email = normalizeEmail(tokenInfo.email)
 
-  if (tokenInfo.aud !== env.googleClientId) {
+  if (!tokenInfo.aud || !env.googleClientIds.includes(tokenInfo.aud)) {
     throw new AuthError('Google token audience is invalid', 401)
   }
 
