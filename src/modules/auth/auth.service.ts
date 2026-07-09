@@ -1,6 +1,7 @@
 import { sign, verify } from 'hono/jwt'
 import { env } from '../../config/env'
 import type {
+  AppleAuthInput,
   AuthProvider,
   AuthUserResponse,
   GoogleAuthInput,
@@ -23,6 +24,36 @@ type GoogleTokenInfo = {
   name?: string
   given_name?: string
 }
+
+type AppleJwtHeader = {
+  alg?: string
+  kid?: string
+}
+
+type AppleJwtPayload = {
+  iss?: string
+  aud?: string
+  exp?: number
+  sub?: string
+  email?: string
+  email_verified?: boolean | string
+}
+
+type AppleJwk = JsonWebKey & {
+  kid?: string
+  alg?: string
+}
+
+type AppleJwksResponse = {
+  keys?: AppleJwk[]
+}
+
+let appleJwksCache:
+  | {
+      expiresAt: number
+      keys: AppleJwk[]
+    }
+  | undefined
 
 export class AuthError extends Error {
   constructor(
@@ -184,6 +215,126 @@ const verifyGoogleIdToken = async (idToken?: string) => {
   }
 }
 
+const decodeBase64Url = (value: string) => {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+
+  return Buffer.from(paddedBase64, 'base64')
+}
+
+const decodeJwtPart = <T>(value: string) => {
+  try {
+    return JSON.parse(decodeBase64Url(value).toString('utf8')) as T
+  } catch {
+    throw new AuthError('Invalid Apple identity token', 401)
+  }
+}
+
+const getAppleJwks = async () => {
+  const now = Date.now()
+
+  if (appleJwksCache && appleJwksCache.expiresAt > now) {
+    return appleJwksCache.keys
+  }
+
+  const response = await fetch('https://appleid.apple.com/auth/keys')
+
+  if (!response.ok) {
+    throw new AuthError('Apple sign-in verification is unavailable', 401)
+  }
+
+  const jwks = (await response.json()) as AppleJwksResponse
+
+  if (!jwks.keys?.length) {
+    throw new AuthError('Apple sign-in verification is unavailable', 401)
+  }
+
+  appleJwksCache = {
+    expiresAt: now + 60 * 60 * 1000,
+    keys: jwks.keys,
+  }
+
+  return jwks.keys
+}
+
+const verifyAppleIdentityToken = async (identityToken?: string) => {
+  const token = identityToken?.trim()
+
+  if (!token) {
+    throw new AuthError('Apple identity token is required', 400)
+  }
+
+  if (!env.appleClientIds.length) {
+    throw new AuthError('Apple sign-in is not configured', 400)
+  }
+
+  const tokenParts = token.split('.')
+
+  if (tokenParts.length !== 3) {
+    throw new AuthError('Invalid Apple identity token', 401)
+  }
+
+  const [encodedHeader, encodedPayload, encodedSignature] = tokenParts
+  const header = decodeJwtPart<AppleJwtHeader>(encodedHeader)
+  const payload = decodeJwtPart<AppleJwtPayload>(encodedPayload)
+
+  if (header.alg !== 'RS256' || !header.kid) {
+    throw new AuthError('Invalid Apple identity token', 401)
+  }
+
+  const keys = await getAppleJwks()
+  const key = keys.find((appleKey) => appleKey.kid === header.kid && appleKey.alg === 'RS256')
+
+  if (!key) {
+    throw new AuthError('Invalid Apple identity token', 401)
+  }
+
+  const publicKey = await crypto.subtle.importKey(
+    'jwk',
+    key,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    },
+    false,
+    ['verify'],
+  )
+  const isSignatureValid = await crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    publicKey,
+    decodeBase64Url(encodedSignature),
+    new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`),
+  )
+
+  if (!isSignatureValid) {
+    throw new AuthError('Invalid Apple identity token', 401)
+  }
+
+  if (payload.iss !== 'https://appleid.apple.com') {
+    throw new AuthError('Apple token issuer is invalid', 401)
+  }
+
+  if (!payload.aud || !env.appleClientIds.includes(payload.aud)) {
+    throw new AuthError('Apple token audience is invalid', 401)
+  }
+
+  if (!payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) {
+    throw new AuthError('Apple identity token is expired', 401)
+  }
+
+  const email = normalizeEmail(payload.email)
+  const isEmailVerified = payload.email_verified === true || payload.email_verified === 'true'
+
+  if (!payload.sub) {
+    throw new AuthError('Apple token profile is invalid', 401)
+  }
+
+  return {
+    appleId: payload.sub,
+    email: validateEmail(email) && isEmailVerified ? email : '',
+  }
+}
+
 export const authService = {
   getGoogleAuthorizationUrl: (state?: string) => {
     return buildGoogleAuthorizationUrl(state)
@@ -282,6 +433,49 @@ export const authService = {
       email,
       googleId,
       providers: ['google'],
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    return createAuthResponse(user)
+  },
+
+  appleAuth: async (input: AppleAuthInput) => {
+    const { appleId, email } = await verifyAppleIdentityToken(input.identityToken)
+    const name = input.name?.trim()
+    const existingAppleUser = await userStore.findByAppleId(appleId)
+    const now = new Date().toISOString()
+
+    if (existingAppleUser) {
+      existingAppleUser.name = name || existingAppleUser.name
+      existingAppleUser.appleId = appleId
+      existingAppleUser.providers = addProvider(existingAppleUser.providers, 'apple')
+      existingAppleUser.updatedAt = now
+
+      return createAuthResponse(await userStore.save(existingAppleUser))
+    }
+
+    if (!email) {
+      throw new AuthError('Apple email is required for first sign-in', 400)
+    }
+
+    const existingEmailUser = await userStore.findByEmail(email)
+
+    if (existingEmailUser) {
+      existingEmailUser.name = name || existingEmailUser.name
+      existingEmailUser.appleId = appleId
+      existingEmailUser.providers = addProvider(existingEmailUser.providers, 'apple')
+      existingEmailUser.updatedAt = now
+
+      return createAuthResponse(await userStore.save(existingEmailUser))
+    }
+
+    const user = await userStore.save({
+      id: crypto.randomUUID(),
+      name: name || email.split('@')[0],
+      email,
+      appleId,
+      providers: ['apple'],
       createdAt: now,
       updatedAt: now,
     })

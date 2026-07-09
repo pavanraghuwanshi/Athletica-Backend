@@ -1,4 +1,4 @@
-export type AuthProvider = 'email' | 'google'
+export type AuthProvider = 'email' | 'google' | 'apple'
 
 export type User = {
   id: string
@@ -6,6 +6,7 @@ export type User = {
   email: string
   passwordHash?: string
   googleId?: string
+  appleId?: string
   providers: AuthProvider[]
   createdAt: string
   updatedAt: string
@@ -24,6 +25,11 @@ export type LoginInput = {
 
 export type GoogleAuthInput = {
   idToken?: string
+}
+
+export type AppleAuthInput = {
+  identityToken?: string
+  name?: string
 }
 
 export type GoogleTokenResponse = {

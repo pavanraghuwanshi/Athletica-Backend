@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { env } from '../../config/env'
 import { httpStatus } from '../../shared/http/status-codes'
 import { AuthError, authService } from './auth.service'
-import type { GoogleAuthInput, LoginInput, RegisterInput } from './auth.types'
+import type { AppleAuthInput, GoogleAuthInput, LoginInput, RegisterInput } from './auth.types'
 
 const getJsonBody = async <T>(context: Context) => {
   try {
@@ -92,6 +92,17 @@ export const authController = {
     try {
       const body = await getJsonBody<GoogleAuthInput>(context)
       const result = await authService.googleAuth(body)
+
+      return context.json(result, httpStatus.ok)
+    } catch (error) {
+      return handleAuthError(context, error)
+    }
+  },
+
+  appleAuth: async (context: Context) => {
+    try {
+      const body = await getJsonBody<AppleAuthInput>(context)
+      const result = await authService.appleAuth(body)
 
       return context.json(result, httpStatus.ok)
     } catch (error) {

@@ -17,6 +17,7 @@ const getUserModel = async () => {
         email: { type: String, required: true, unique: true, lowercase: true, trim: true },
         passwordHash: { type: String },
         googleId: { type: String, sparse: true },
+        appleId: { type: String, sparse: true },
         providers: { type: [String], required: true },
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
@@ -28,6 +29,7 @@ const getUserModel = async () => {
     )
 
     userSchema.index({ googleId: 1 }, { sparse: true })
+    userSchema.index({ appleId: 1 }, { sparse: true })
     userModel = mongoose.models.User || mongoose.model<UserDocument>('User', userSchema)
   }
 
@@ -56,6 +58,12 @@ export const userStore = {
     const UserModel = await getUserModel()
 
     return toUser(await UserModel.findOne({ id }))
+  },
+
+  findByAppleId: async (appleId: string) => {
+    const UserModel = await getUserModel()
+
+    return toUser(await UserModel.findOne({ appleId }))
   },
 
   save: async (user: User) => {

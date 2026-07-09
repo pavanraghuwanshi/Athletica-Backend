@@ -12,4 +12,8 @@ export const env = {
   googleClientSecret: Bun.env.GOOGLE_CLIENT_SECRET ?? '',
   googleRedirectUri: Bun.env.GOOGLE_REDIRECT_URI ?? '',
   frontendAuthRedirectUrl: Bun.env.FRONTEND_AUTH_REDIRECT_URL ?? '',
+  appleClientIds: (Bun.env.APPLE_CLIENT_IDS ?? '')
+    .split(',')
+    .map((clientId) => clientId.trim())
+    .filter(Boolean),
 }
