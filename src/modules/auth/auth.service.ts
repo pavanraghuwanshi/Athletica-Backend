@@ -218,13 +218,19 @@ const verifyGoogleIdToken = async (idToken?: string) => {
 const decodeBase64Url = (value: string) => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
   const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+  const binary = atob(paddedBase64)
+  const bytes = new Uint8Array(binary.length)
 
-  return Buffer.from(paddedBase64, 'base64')
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return bytes
 }
 
 const decodeJwtPart = <T>(value: string) => {
   try {
-    return JSON.parse(decodeBase64Url(value).toString('utf8')) as T
+    return JSON.parse(new TextDecoder().decode(decodeBase64Url(value))) as T
   } catch {
     throw new AuthError('Invalid Apple identity token', 401)
   }
