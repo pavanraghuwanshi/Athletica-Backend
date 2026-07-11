@@ -4,5 +4,5 @@ import { healthRoutes } from '../modules/health/health.routes'
 
 export const registerRoutes = (app: Hono) => {
   app.route('/api/', healthRoutes)
-  app.route('/api/auth', authRoutes)
+  app.route('/auth', authRoutes)
 }

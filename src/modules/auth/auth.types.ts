@@ -12,6 +12,10 @@ export type User = {
   updatedAt: string
 }
 
+export type GoogleAuthInput = {
+  idToken?: string
+}
+
 export type RegisterInput = {
   name?: string
   email?: string
@@ -21,10 +25,6 @@ export type RegisterInput = {
 export type LoginInput = {
   email?: string
   password?: string
-}
-
-export type GoogleAuthInput = {
-  idToken?: string
 }
 
 export type AppleAuthInput = {

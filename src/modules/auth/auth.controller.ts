@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { env } from '../../config/env'
 import { httpStatus } from '../../shared/http/status-codes'
 import { AuthError, authService } from './auth.service'
-import type { AppleAuthInput, GoogleAuthInput, LoginInput, RegisterInput } from './auth.types'
+import type { AppleAuthInput, LoginInput, RegisterInput } from './auth.types'
 
 const getJsonBody = async <T>(context: Context) => {
   try {
@@ -18,17 +18,6 @@ const handleAuthError = (context: Context, error: unknown) => {
   }
 
   throw error
-}
-
-const getBearerToken = (context: Context) => {
-  const authorizationHeader = context.req.header('Authorization') ?? ''
-  const [scheme, token] = authorizationHeader.split(' ')
-
-  if (scheme !== 'Bearer' || !token) {
-    throw new AuthError('Bearer token is required', httpStatus.unauthorized)
-  }
-
-  return token
 }
 
 export const authController = {
@@ -88,33 +77,12 @@ export const authController = {
     }
   },
 
-  googleAuth: async (context: Context) => {
-    try {
-      const body = await getJsonBody<GoogleAuthInput>(context)
-      const result = await authService.googleAuth(body)
-
-      return context.json(result, httpStatus.ok)
-    } catch (error) {
-      return handleAuthError(context, error)
-    }
-  },
-
   appleAuth: async (context: Context) => {
     try {
       const body = await getJsonBody<AppleAuthInput>(context)
       const result = await authService.appleAuth(body)
 
       return context.json(result, httpStatus.ok)
-    } catch (error) {
-      return handleAuthError(context, error)
-    }
-  },
-
-  me: async (context: Context) => {
-    try {
-      const user = await authService.getUserFromToken(getBearerToken(context))
-
-      return context.json({ user }, httpStatus.ok)
     } catch (error) {
       return handleAuthError(context, error)
     }

@@ -1,4 +1,4 @@
-import { sign, verify } from 'hono/jwt'
+import { sign } from 'hono/jwt'
 import { env } from '../../config/env'
 import type {
   AppleAuthInput,
@@ -481,30 +481,5 @@ export const authService = {
     })
 
     return createAuthResponse(user)
-  },
-
-  getUserFromToken: async (token: string) => {
-    try {
-      const payload = await verify(token, env.jwtSecret, 'HS256')
-      const userId = payload.sub
-
-      if (typeof userId !== 'string') {
-        throw new AuthError('Invalid token', 401)
-      }
-
-      const user = await userStore.findById(userId)
-
-      if (!user) {
-        throw new AuthError('User not found', 404)
-      }
-
-      return toUserResponse(user)
-    } catch (error) {
-      if (error instanceof AuthError) {
-        throw error
-      }
-
-      throw new AuthError('Invalid token', 401)
-    }
   },
 }

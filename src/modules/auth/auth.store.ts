@@ -54,12 +54,6 @@ export const userStore = {
     return toUser(await UserModel.findOne({ email: email.toLowerCase() }))
   },
 
-  findById: async (id: string) => {
-    const UserModel = await getUserModel()
-
-    return toUser(await UserModel.findOne({ id }))
-  },
-
   findByAppleId: async (appleId: string) => {
     const UserModel = await getUserModel()
 

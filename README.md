@@ -44,9 +44,9 @@ Base path: `/auth`
   ```txt
   Open this URL in browser: http://localhost:3000/auth/google
   ```
-- `GET /auth/register` - browser alias for Google sign-in
+- `GET /auth/google/callback` - Google redirects here after login
   ```txt
-  Open this URL in browser: http://localhost:3000/auth/register
+  Google Console redirect URI: http://localhost:3000/auth/google/callback
   ```
 - `POST /auth/register` - email/password registration
   ```json
@@ -56,21 +56,9 @@ Base path: `/auth`
   ```json
   { "email": "pavan@example.com", "password": "secret123" }
   ```
-- `GET /auth/google/start` - redirect user to Google login page
-  ```txt
-  Open this URL in browser: http://localhost:3000/auth/google/start
-  ```
-- `GET /auth/google/callback` - Google redirects here after login
-  ```txt
-  Google Console redirect URI: http://localhost:3000/auth/google/callback
-  ```
-- `POST /auth/google` - frontend Google button login/register option
+- `POST /auth/apple` - iOS Apple sign-in
   ```json
-  { "idToken": "google-id-token-from-frontend" }
-  ```
-- `GET /auth/me` - current user from bearer token
-  ```txt
-  Authorization: Bearer <token>
+  { "identityToken": "apple_identity_token_from_ios", "name": "Pavan" }
   ```
 
 Set these environment variables:
@@ -80,12 +68,19 @@ JWT_SECRET=your-long-random-secret
 MONGODB_URI=mongodb+srv://parenteye367:parenteye90@cluster0.o60im.mongodb.net/schoolmanagement?retryWrites=true&w=majority
 MONGODB_DB_NAME=AtheleticaDB
 GOOGLE_CLIENT_ID=your-google-oauth-web-client-id
+GOOGLE_CLIENT_IDS=your-google-oauth-web-client-id,your-google-oauth-ios-client-id,your-google-oauth-android-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 FRONTEND_AUTH_REDIRECT_URL=http://localhost:5173/auth/callback
+APPLE_CLIENT_IDS=your-ios-bundle-id-or-apple-services-id
 ```
 
 User data is stored in MongoDB collection `AtheleticaDB.users`.
+
+Use `GOOGLE_CLIENT_ID` for the backend browser redirect flow. Use `GOOGLE_CLIENT_IDS` as a comma-separated allowlist for Android/iOS `idToken` verification when mobile tokens have different audiences.
+Use `APPLE_CLIENT_IDS` as a comma-separated allowlist for Apple `identityToken` verification. For iOS native sign-in this is usually the app bundle ID; for web/service flow it is the Apple Services ID.
+
+`name` is optional, but iOS only gives the full name on the first Apple sign-in, so send it when available.
 
 ## Google Console setup
 
@@ -104,7 +99,6 @@ User data is stored in MongoDB collection `AtheleticaDB.users`.
 13. Set `FRONTEND_AUTH_REDIRECT_URL` to the frontend page that should receive the app JWT after Google login.
 14. Start login by opening `/auth/google`; Google will redirect back to `/auth/google/callback`.
 
-There are two supported Google login styles:
+Supported Google login flow:
 
-- Backend redirect flow: browser opens `GET /auth/google`, user logs in on Google, backend callback returns JSON or redirects to `FRONTEND_AUTH_REDIRECT_URL?token=<jwt>`.
-- Frontend button flow: frontend gets Google `idToken` and sends it to `POST /auth/google`; backend verifies it and returns the app JWT.
+- Browser opens `GET /auth/google`, user logs in on Google, backend callback returns JSON or redirects to `FRONTEND_AUTH_REDIRECT_URL?token=<jwt>`.
