@@ -3,6 +3,7 @@ import { env } from '../../config/env'
 import { httpStatus } from '../../shared/http/status-codes'
 import { AuthError, authService } from './auth.service'
 import type { AppleAuthInput, GoogleAuthInput, LoginInput, RegisterInput } from './auth.types'
+import { getBearerToken } from './auth.guard'
 
 const getJsonBody = async <T>(context: Context) => {
   try {
@@ -18,17 +19,6 @@ const handleAuthError = (context: Context, error: unknown) => {
   }
 
   throw error
-}
-
-const getBearerToken = (context: Context) => {
-  const authorizationHeader = context.req.header('Authorization') ?? ''
-  const [scheme, token] = authorizationHeader.split(' ')
-
-  if (scheme !== 'Bearer' || !token) {
-    throw new AuthError('Bearer token is required', httpStatus.unauthorized)
-  }
-
-  return token
 }
 
 export const authController = {
@@ -115,6 +105,28 @@ export const authController = {
       const user = await authService.getUserFromToken(getBearerToken(context))
 
       return context.json({ user }, httpStatus.ok)
+    } catch (error) {
+      return handleAuthError(context, error)
+    }
+  },
+
+  logout: async (context: Context) => {
+    try {
+      return context.json(await authService.logout(getBearerToken(context)), httpStatus.ok)
+    } catch (error) {
+      return handleAuthError(context, error)
+    }
+  },
+
+  deleteAccount: async (context: Context) => {
+    try {
+      const body = await getJsonBody<{ confirmation?: string }>(context)
+      const result = await authService.deleteAccount(
+        getBearerToken(context),
+        body.confirmation,
+      )
+
+      return context.json(result, httpStatus.ok)
     } catch (error) {
       return handleAuthError(context, error)
     }

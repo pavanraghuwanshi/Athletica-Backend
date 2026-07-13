@@ -89,4 +89,9 @@ export const userStore = {
 
     return toUser(document) ?? normalizedUser
   },
+
+  deleteById: async (id: string) => {
+    const UserModel = await getUserModel()
+    await UserModel.deleteOne({ id })
+  },
 }

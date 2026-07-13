@@ -93,4 +93,11 @@ export const accessStore = {
   setStatus: async (id: string, status: AccessStatus) => {
     return accessStore.update(id, { status })
   },
+
+  deleteByUserId: async (userId: string) => {
+    const AccessModel = await getAccessModel()
+    await AccessModel.deleteMany({
+      $or: [{ requesterUserId: userId }, { ownerUserId: userId }],
+    })
+  },
 }

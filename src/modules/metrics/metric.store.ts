@@ -1,6 +1,7 @@
 import mongoose, { Schema, type Model } from 'mongoose'
 import { connectDatabase } from '../../config/db'
 import { metricCollectionNames, type MetricName, type MetricRecord } from './metric.types'
+import { metricNames } from './metric.types'
 
 type StoredMetric = {
   ownerUserId: string
@@ -105,5 +106,17 @@ export const metricStore = {
     const MetricModel = await getMetricModel(metric)
 
     return MetricModel.findOne({ ownerUserId, recordId }).lean()
+  },
+
+  deleteAllByOwner: async (ownerUserId: string) => {
+    const results = await Promise.all(
+      metricNames.map(async (metric) => {
+        const MetricModel = await getMetricModel(metric)
+        const result = await MetricModel.deleteMany({ ownerUserId })
+        return result.deletedCount
+      }),
+    )
+
+    return results.reduce((total, deletedCount) => total + deletedCount, 0)
   },
 }

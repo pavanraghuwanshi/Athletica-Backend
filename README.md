@@ -88,6 +88,22 @@ Base path: `/api/auth`
   ```txt
   Authorization: Bearer <token>
   ```
+- `POST /api/auth/logout` - server-side logout. No JSON payload.
+  ```http
+  POST /api/auth/logout
+  Authorization: Bearer <token>
+  ```
+  The current JWT is revoked until its original expiry and cannot be used again.
+- `DELETE /api/auth/account` - permanently delete the authenticated account and associated data.
+  ```http
+  DELETE /api/auth/account
+  Authorization: Bearer <token>
+  Content-Type: application/json
+  ```
+  ```json
+  { "confirmation": "DELETE" }
+  ```
+  This permanently deletes the user, all records from their 14 health collections, and every sent/received data-admin request or grant. The deleted user's JWTs stop working because the user no longer exists.
 
 Set these environment variables:
 
