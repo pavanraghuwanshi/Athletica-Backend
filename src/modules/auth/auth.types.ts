@@ -1,4 +1,5 @@
 export type AuthProvider = 'email' | 'google' | 'apple'
+export type UserRole = 'user' | 'superAdmin'
 
 export type User = {
   id: string
@@ -8,6 +9,7 @@ export type User = {
   googleId?: string
   appleId?: string
   providers: AuthProvider[]
+  role: UserRole
   createdAt: string
   updatedAt: string
 }
@@ -43,6 +45,7 @@ export type AuthUserResponse = {
   name: string
   email: string
   providers: AuthProvider[]
+  role: UserRole
   createdAt: string
   updatedAt: string
 }

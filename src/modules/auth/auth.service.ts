@@ -14,7 +14,7 @@ import { userStore } from './auth.store'
 
 const tokenExpiresInSeconds = 60 * 60 * 24 * 7
 
-type AuthErrorStatusCode = 400 | 401 | 404 | 409
+type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409
 
 type GoogleTokenInfo = {
   aud?: string
@@ -78,6 +78,7 @@ const toUserResponse = (user: User): AuthUserResponse => {
     name: user.name,
     email: user.email,
     providers: user.providers,
+    role: user.role ?? 'user',
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   }
@@ -226,6 +227,10 @@ const decodeBase64Url = (value: string) => {
   }
 
   return bytes
+}
+
+const getRoleForEmail = (email: string) => {
+  return env.superAdminEmail && email === env.superAdminEmail ? 'superAdmin' : 'user'
 }
 
 const decodeJwtPart = <T>(value: string) => {
@@ -378,6 +383,7 @@ export const authService = {
       existingUser.passwordHash = passwordHash
       existingUser.providers = addProvider(existingUser.providers, 'email')
       existingUser.updatedAt = now
+      existingUser.role = getRoleForEmail(email)
 
       return createAuthResponse(await userStore.save(existingUser))
     }
@@ -388,6 +394,7 @@ export const authService = {
       email,
       passwordHash,
       providers: ['email'],
+      role: getRoleForEmail(email),
       createdAt: now,
       updatedAt: now,
     })
@@ -415,6 +422,15 @@ export const authService = {
       throw new AuthError('Invalid email or password', 401)
     }
 
+    const configuredRole = getRoleForEmail(email)
+
+    if (user.role !== configuredRole) {
+      user.role = configuredRole
+      user.updatedAt = new Date().toISOString()
+
+      return createAuthResponse(await userStore.save(user))
+    }
+
     return createAuthResponse(user)
   },
 
@@ -429,6 +445,7 @@ export const authService = {
       existingUser.googleId = googleId
       existingUser.providers = addProvider(existingUser.providers, 'google')
       existingUser.updatedAt = now
+      existingUser.role = getRoleForEmail(email)
 
       return createAuthResponse(await userStore.save(existingUser))
     }
@@ -439,6 +456,7 @@ export const authService = {
       email,
       googleId,
       providers: ['google'],
+      role: getRoleForEmail(email),
       createdAt: now,
       updatedAt: now,
     })
@@ -457,6 +475,7 @@ export const authService = {
       existingAppleUser.appleId = appleId
       existingAppleUser.providers = addProvider(existingAppleUser.providers, 'apple')
       existingAppleUser.updatedAt = now
+      existingAppleUser.role = getRoleForEmail(existingAppleUser.email)
 
       return createAuthResponse(await userStore.save(existingAppleUser))
     }
@@ -472,6 +491,7 @@ export const authService = {
       existingEmailUser.appleId = appleId
       existingEmailUser.providers = addProvider(existingEmailUser.providers, 'apple')
       existingEmailUser.updatedAt = now
+      existingEmailUser.role = getRoleForEmail(email)
 
       return createAuthResponse(await userStore.save(existingEmailUser))
     }
@@ -482,6 +502,7 @@ export const authService = {
       email,
       appleId,
       providers: ['apple'],
+      role: getRoleForEmail(email),
       createdAt: now,
       updatedAt: now,
     })

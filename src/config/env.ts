@@ -16,4 +16,5 @@ export const env = {
     .split(',')
     .map((clientId) => clientId.trim())
     .filter(Boolean),
+  superAdminEmail: (Bun.env.SUPER_ADMIN_EMAIL ?? '').trim().toLowerCase(),
 }

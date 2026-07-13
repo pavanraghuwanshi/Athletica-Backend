@@ -19,6 +19,7 @@ const getUserModel = async () => {
         googleId: { type: String, sparse: true },
         appleId: { type: String, sparse: true },
         providers: { type: [String], required: true },
+        role: { type: String, enum: ['user', 'superAdmin'], required: true, default: 'user' },
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
       },
@@ -37,14 +38,20 @@ const getUserModel = async () => {
 }
 
 const toUser = (document: UserDocument | null) => {
-  return document?.toObject<User>({
+  const user = document?.toObject<User>({
     flattenMaps: true,
     transform: (_document, user) => {
-      delete user._id
+      delete (user as { _id?: unknown })._id
 
       return user
     },
   })
+
+  if (user && user.role !== 'superAdmin') {
+    user.role = 'user'
+  }
+
+  return user
 }
 
 export const userStore = {
