@@ -26,6 +26,7 @@ type GoogleTokenInfo = {
   email_verified?: string
   name?: string
   given_name?: string
+  picture?: string
 }
 
 type AppleJwtHeader = {
@@ -80,6 +81,7 @@ const toUserResponse = (user: User): AuthUserResponse => {
     id: user.id,
     name: user.name,
     email: user.email,
+    picture: user.picture,
     providers: user.providers,
     role: user.role ?? 'user',
     createdAt: user.createdAt,
@@ -216,6 +218,7 @@ const verifyGoogleIdToken = async (idToken?: string) => {
     email,
     googleId: tokenInfo.sub,
     name: tokenInfo.name?.trim() || tokenInfo.given_name?.trim() || email.split('@')[0],
+    picture: tokenInfo.picture?.trim() || undefined,
   }
 }
 
@@ -461,7 +464,7 @@ export const authService = {
   },
 
   googleAuth: async (input: GoogleAuthInput) => {
-    const { email, googleId, name } = await verifyGoogleIdToken(input.idToken)
+    const { email, googleId, name, picture } = await verifyGoogleIdToken(input.idToken)
 
     const existingUser = await userStore.findByEmail(email)
     const now = new Date().toISOString()
@@ -469,6 +472,7 @@ export const authService = {
     if (existingUser) {
       existingUser.name = name
       existingUser.googleId = googleId
+      existingUser.picture = picture || existingUser.picture
       existingUser.providers = addProvider(existingUser.providers, 'google')
       existingUser.updatedAt = now
       existingUser.role = getRoleForEmail(email)
@@ -481,6 +485,7 @@ export const authService = {
       name,
       email,
       googleId,
+      picture,
       providers: ['google'],
       role: getRoleForEmail(email),
       createdAt: now,

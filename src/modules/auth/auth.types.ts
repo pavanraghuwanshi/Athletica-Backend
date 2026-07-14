@@ -5,6 +5,7 @@ export type User = {
   id: string
   name: string
   email: string
+  picture?: string
   passwordHash?: string
   googleId?: string
   appleId?: string
@@ -44,6 +45,7 @@ export type AuthUserResponse = {
   id: string
   name: string
   email: string
+  picture?: string
   providers: AuthProvider[]
   role: UserRole
   createdAt: string

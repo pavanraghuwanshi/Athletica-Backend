@@ -15,6 +15,7 @@ const getUserModel = async () => {
         id: { type: String, required: true, unique: true },
         name: { type: String, required: true },
         email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+        picture: { type: String },
         passwordHash: { type: String },
         googleId: { type: String, sparse: true },
         appleId: { type: String, sparse: true },
