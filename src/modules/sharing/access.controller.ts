@@ -28,6 +28,16 @@ const getRequestId = (context: Context) => {
 }
 
 export const accessController = {
+  connect: async (context: Context) => {
+    try {
+      const user = await getAuthenticatedUser(context)
+      const body = await getBody<{ email?: string }>(context)
+      return context.json(await accessService.connectByEmail(user, body.email), 201)
+    } catch (error) {
+      return handleError(context, error)
+    }
+  },
+
   create: async (context: Context) => {
     try {
       const user = await getAuthenticatedUser(context)

@@ -17,7 +17,7 @@ import { accessStore } from '../sharing/access.store'
 
 const tokenExpiresInSeconds = 60 * 60 * 24 * 7
 
-type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409
+type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 502
 
 type GoogleTokenInfo = {
   aud?: string

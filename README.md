@@ -544,6 +544,14 @@ All paths use the `/api/admin-access` base and require a bearer token.
 
 ### Data-admin API endpoints and payloads
 
+- `POST /api/admin-access/connect` - send a six-digit connection OTP to a registered user's email.
+
+  ```json
+  { "email": "user@example.com" }
+  ```
+
+  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`.
+
 - `POST /api/admin-access/requests` - request access to another user's health data.
 
   ```json
