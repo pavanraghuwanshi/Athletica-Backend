@@ -17,12 +17,18 @@ const generateOtp = () => {
   return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0')
 }
 
+const OTP_TTL_MS = 10 * 60 * 1000
+const OTP_HOLD_MS = 10 * 60 * 1000
+const MAX_OTP_SENDS_BEFORE_HOLD = 3
+
 const toResponse = async (request: {
   id: string
   requesterUserId: string
   ownerUserId: string
   status: string
   otpExpiresAt?: Date | null
+  otpSendCount?: number | null
+  otpHoldUntil?: Date | null
   verifiedAt?: Date | null
   createdAt: Date
   updatedAt: Date
@@ -38,10 +44,23 @@ const toResponse = async (request: {
     owner: owner ? { id: owner.id, name: owner.name, email: owner.email } : null,
     status: request.status,
     otpExpiresAt: request.otpExpiresAt,
+    otpSendsRemaining:
+      request.status === 'otpPending'
+        ? Math.max(0, MAX_OTP_SENDS_BEFORE_HOLD - (request.otpSendCount ?? 0))
+        : undefined,
+    otpHoldUntil: request.otpHoldUntil,
     verifiedAt: request.verifiedAt,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
   }
+}
+
+const sendConnectionOtpEmail = async (ownerEmail: string, requester: AuthUserResponse, otp: string) => {
+  await sendEmail({
+    to: ownerEmail,
+    subject: 'Your Athhleticaa connection OTP',
+    text: `${requester.name} (${requester.email}) wants to connect with your Athhleticaa account. Your OTP is ${otp}. It expires in 10 minutes. Share it only if you approve this connection.`,
+  })
 }
 
 export const accessService = {
@@ -65,24 +84,64 @@ export const accessService = {
     const existing = await accessStore.findOpen(requester.id, owner.id)
 
     if (existing) {
+      if (existing.status === 'otpPending') {
+        const now = Date.now()
+
+        if (existing.otpHoldUntil && existing.otpHoldUntil.getTime() > now) {
+          throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
+        }
+
+        const currentSendCount =
+          existing.otpHoldUntil && existing.otpHoldUntil.getTime() <= now ? 0 : existing.otpSendCount ?? 0
+
+        if (currentSendCount >= MAX_OTP_SENDS_BEFORE_HOLD) {
+          const otpHoldUntil = new Date(now + OTP_HOLD_MS)
+          await accessStore.update(existing.id, { otpHoldUntil })
+          throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
+        }
+
+        const otp = generateOtp()
+        const otpExpiresAt = new Date(now + OTP_TTL_MS)
+        const otpSendCount = currentSendCount + 1
+        const otpHoldUntil = otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD ? new Date(now + OTP_HOLD_MS) : undefined
+        const updated = await accessStore.update(existing.id, {
+          otpHash: await hashOtp(existing.id, otp),
+          otpExpiresAt,
+          otpSendCount,
+          otpHoldUntil,
+        })
+
+        try {
+          await sendConnectionOtpEmail(owner.email, requester, otp)
+        } catch {
+          throw new AuthError('Unable to send OTP email', 502)
+        }
+
+        return {
+          request: await toResponse(updated!),
+          message:
+            otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD
+              ? 'OTP sent to the user email. Resend limit reached; try again after 10 minutes.'
+              : 'OTP sent to the user email. It expires in 10 minutes.',
+        }
+      }
+
       throw new AuthError('An open or active request already exists for this user', 409)
     }
 
     const request = await accessStore.create(requester.id, owner.id)
     const otp = generateOtp()
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000)
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
     const updated = await accessStore.update(request.id, {
       status: 'otpPending',
       otpHash: await hashOtp(request.id, otp),
       otpExpiresAt,
+      otpSendCount: 1,
+      otpHoldUntil: undefined,
     })
 
     try {
-      await sendEmail({
-        to: owner.email,
-        subject: 'Your Athhleticaa connection OTP',
-        text: `${requester.name} (${requester.email}) wants to connect with your Athhleticaa account. Your OTP is ${otp}. It expires in 10 minutes. Share it only if you approve this connection.`,
-      })
+      await sendConnectionOtpEmail(owner.email, requester, otp)
     } catch {
       await accessStore.deleteById(request.id)
       throw new AuthError('Unable to send OTP email', 502)
@@ -132,11 +191,13 @@ export const accessService = {
     }
 
     const otp = generateOtp()
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000)
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
     const updated = await accessStore.update(request.id, {
       status: 'otpPending',
       otpHash: await hashOtp(request.id, otp),
       otpExpiresAt,
+      otpSendCount: 1,
+      otpHoldUntil: undefined,
     })
 
     return {
@@ -161,6 +222,8 @@ export const accessService = {
       status: 'rejected',
       otpHash: undefined,
       otpExpiresAt: undefined,
+      otpSendCount: undefined,
+      otpHoldUntil: undefined,
     }))!)
   },
 
@@ -188,6 +251,8 @@ export const accessService = {
       status: 'active',
       otpHash: undefined,
       otpExpiresAt: undefined,
+      otpSendCount: undefined,
+      otpHoldUntil: undefined,
       verifiedAt: new Date(),
     }))!)
   },

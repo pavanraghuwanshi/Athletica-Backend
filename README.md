@@ -550,7 +550,7 @@ All paths use the `/api/admin-access` base and require a bearer token.
   { "email": "user@example.com" }
   ```
 
-  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`.
+  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again for the same pending connection resends a fresh OTP up to 3 sends, then holds resends for 10 minutes.
 
 - `POST /api/admin-access/requests` - request access to another user's health data.
 

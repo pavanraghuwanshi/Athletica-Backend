@@ -21,6 +21,8 @@ const getAccessModel = async () => {
         },
         otpHash: { type: String },
         otpExpiresAt: { type: Date },
+        otpSendCount: { type: Number, default: 0 },
+        otpHoldUntil: { type: Date },
         verifiedAt: { type: Date },
       },
       { collection: 'health_access_requests', timestamps: true, versionKey: false },
@@ -57,7 +59,7 @@ export const accessStore = {
 
   update: async (
     id: string,
-    update: Partial<Pick<AccessRequest, 'status' | 'otpHash' | 'otpExpiresAt' | 'verifiedAt'>>,
+    update: Partial<Pick<AccessRequest, 'status' | 'otpHash' | 'otpExpiresAt' | 'otpSendCount' | 'otpHoldUntil' | 'verifiedAt'>>,
   ) => {
     const AccessModel = await getAccessModel()
     const entries = Object.entries(update)

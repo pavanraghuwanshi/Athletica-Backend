@@ -7,6 +7,8 @@ export type AccessRequest = {
   status: AccessStatus
   otpHash?: string
   otpExpiresAt?: Date
+  otpSendCount?: number
+  otpHoldUntil?: Date
   verifiedAt?: Date
   createdAt: Date
   updatedAt: Date
