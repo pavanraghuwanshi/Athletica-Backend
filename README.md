@@ -136,7 +136,7 @@ All paths use the `/api/users` base and require a bearer token.
   GET /api/users/user-id/overview
   GET /api/users/user-id/overview?date=2026-07-10
   ```
-  Without `date`, each item in `latestRecords` is the user's newest record for that metric across all dates. Metrics with no data are returned as `null`. The response also includes `healthScore`, normalized `cards`, and `activity`, calculated from those latest records.
+  Without `date`, each item in `latestRecords` is the user's newest measurement for that metric across all dates. For daily payloads, the API selects the nested sample/session/hour with the greatest measurement timestamp instead of using the database update time or returning the full daily wrapper. Metrics with no data are returned as `null`. The response also includes `healthScore`, normalized `cards`, and `activity`, calculated from those latest measurements.
 
 Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerUserId` or `ownerEmail`. `superAdmin` can read any user's health data with `ownerUserId` or `ownerEmail`.
 

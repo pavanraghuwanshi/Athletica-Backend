@@ -108,35 +108,8 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
   return { id: owner.id, email: owner.email }
 }
 
-const asRecord = (value: unknown) => {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
-}
-
-const asArray = (value: unknown) => {
-  return Array.isArray(value) ? value : []
-}
-
 const asNumber = (value: unknown) => {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
-}
-
-const latestSample = (record: MetricRecord, containerKey: string) => {
-  const container = asRecord(record[containerKey])
-  const samples = asArray(container?.samples).filter(asRecord)
-
-  return samples.length ? samples[samples.length - 1] : undefined
-}
-
-const averageSamples = (record: MetricRecord, containerKey: string, sampleKey: string) => {
-  const container = asRecord(record[containerKey])
-  const samples = asArray(container?.samples).filter(asRecord)
-  const values = samples.map((sample) => asNumber(sample[sampleKey])).filter((value): value is number => value !== undefined)
-
-  if (!values.length) {
-    return undefined
-  }
-
-  return Math.round(values.reduce((total, value) => total + value, 0) / values.length)
 }
 
 const formatMinutes = (minutes?: number) => {
@@ -168,6 +141,19 @@ const getUpdatedAt = (document?: MetricDocumentLike) => {
   }
 
   return undefined
+}
+
+const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timestampField: string }>> = {
+  pedometer: { arrayPath: 'hourly_json', timestampField: 'timestamp' },
+  sleep: { arrayPath: 'sleep_json.sessions', timestampField: 'endTime' },
+  bloodOxygen: { arrayPath: 'blood_oxygen_json.samples', timestampField: 'timestamp' },
+  bloodGlucose: { arrayPath: 'blood_glucose_json.samples', timestampField: 'timestamp' },
+  bloodComponents: { arrayPath: 'blood_components_json.samples', timestampField: 'timestamp' },
+  bodyTemperature: { arrayPath: 'body_temperature_json.samples', timestampField: 'timestamp' },
+  hrv: { arrayPath: 'hrv_json.samples', timestampField: 'timestamp' },
+  stress: { arrayPath: 'stress_json.samples', timestampField: 'timestamp' },
+  met: { arrayPath: 'met_json.samples', timestampField: 'timestamp' },
+  sportsWorkout: { arrayPath: 'samples_json', timestampField: 'timestamp' },
 }
 
 const getHealthScore = (cards: Array<{ value?: number | string; key: string }>) => {
@@ -204,16 +190,7 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
   const met = documents.met?.data
   const bloodComponents = documents.bloodComponents?.data
   const pedometer = documents.pedometer?.data
-  const glucoseSample = bloodGlucose ? latestSample(bloodGlucose, 'blood_glucose_json') : undefined
-  const oxygenJson = bloodOxygen ? asRecord(bloodOxygen.blood_oxygen_json) : undefined
-  const sleepSessions = sleep ? asArray(asRecord(sleep.sleep_json)?.sessions).filter(asRecord) : []
-  const sleepMinutes = sleepSessions
-    .map((session) => asNumber(session.totalMinutes))
-    .filter((value): value is number => value !== undefined)
-    .reduce((total, value) => total + value, 0)
-  const bodyTempSample = bodyTemperature ? latestSample(bodyTemperature, 'body_temperature_json') : undefined
-  const metSample = met ? latestSample(met, 'met_json') : undefined
-  const uricAcidSample = bloodComponents ? latestSample(bloodComponents, 'blood_components_json') : undefined
+  const sleepMinutes = asNumber(sleep?.totalMinutes)
   const cards = [
     {
       key: 'heartRate',
@@ -235,21 +212,21 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     {
       key: 'bloodGlucose',
       title: 'Blood Glucose',
-      value: asNumber(glucoseSample?.glucose),
+      value: asNumber(bloodGlucose?.glucose),
       unit: 'mmol/L',
       updatedAt: getUpdatedAt(documents.bloodGlucose),
     },
     {
       key: 'spo2',
       title: 'SPO2',
-      value: asNumber(oxygenJson?.average) ?? asNumber(latestSample(bloodOxygen ?? {}, 'blood_oxygen_json')?.oxygen),
+      value: asNumber(bloodOxygen?.oxygen),
       unit: '%',
       updatedAt: getUpdatedAt(documents.bloodOxygen),
     },
     {
       key: 'stress',
       title: 'Stress',
-      value: stress ? averageSamples(stress, 'stress_json', 'stress') : undefined,
+      value: asNumber(stress?.stress),
       updatedAt: getUpdatedAt(documents.stress),
     },
     {
@@ -262,14 +239,14 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     {
       key: 'hrv',
       title: 'HRV',
-      value: hrv ? averageSamples(hrv, 'hrv_json', 'hrv') : undefined,
+      value: asNumber(hrv?.hrv),
       unit: 'ms',
       updatedAt: getUpdatedAt(documents.hrv),
     },
     {
       key: 'bodyTemperature',
       title: 'Body Temp',
-      value: asNumber(bodyTempSample?.temperatureCelsius),
+      value: asNumber(bodyTemperature?.temperatureCelsius),
       unit: '°C',
       updatedAt: getUpdatedAt(documents.bodyTemperature),
     },
@@ -295,23 +272,23 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     {
       key: 'metabolism',
       title: 'Metabolism',
-      value: asNumber(bodyComposition?.basal_metabolic_rate) ?? asNumber(metSample?.met),
+      value: asNumber(bodyComposition?.basal_metabolic_rate) ?? asNumber(met?.met),
       unit: asNumber(bodyComposition?.basal_metabolic_rate) !== undefined ? 'kcal' : 'MET',
       updatedAt: getUpdatedAt(documents.bodyComposition) ?? getUpdatedAt(documents.met),
     },
     {
       key: 'bloodComponents',
       title: 'Blood Components',
-      value: asNumber(uricAcidSample?.uricAcid),
+      value: asNumber(bloodComponents?.uricAcid),
       unit: 'µmol/L',
       meta: { label: 'Uric acid' },
       updatedAt: getUpdatedAt(documents.bloodComponents),
     },
   ]
   const activity = {
-    steps: asNumber(pedometer?.total_steps),
-    caloriesKcal: asNumber(pedometer?.calories_kcal),
-    distanceMeters: asNumber(pedometer?.distance_meters),
+    steps: asNumber(pedometer?.steps) ?? asNumber(pedometer?.total_steps),
+    caloriesKcal: asNumber(pedometer?.caloriesKcal) ?? asNumber(pedometer?.calories_kcal),
+    distanceMeters: asNumber(pedometer?.distanceMeters) ?? asNumber(pedometer?.distance_meters),
     updatedAt: getUpdatedAt(documents.pedometer),
   }
 
@@ -376,12 +353,25 @@ export const metricService = {
     const owner = await resolveOwner(viewer, { ownerUserId })
     const entries = await Promise.all(
       metricNames.map(async (metric) => {
-        const [document] = await metricStore.find({
-          ownerUserId: owner.id,
-          metric,
-          ...(date ? { date } : {}),
-          limit: 1,
-        })
+        const nested = nestedMeasurements[metric]
+        let document: MetricDocumentLike | undefined = nested
+          ? await metricStore.findLatestNested({
+              ownerUserId: owner.id,
+              metric,
+              ...(date ? { date } : {}),
+              ...nested,
+            })
+          : undefined
+
+        if (!nested || (!document && metric === 'sportsWorkout')) {
+          const [latestDocument] = await metricStore.find({
+            ownerUserId: owner.id,
+            metric,
+            ...(date ? { date } : {}),
+            limit: 1,
+          })
+          document = latestDocument
+        }
 
         return [metric, document] as const
       }),

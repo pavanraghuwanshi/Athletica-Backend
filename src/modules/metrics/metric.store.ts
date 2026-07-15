@@ -108,6 +108,43 @@ export const metricStore = {
     return MetricModel.findOne({ ownerUserId, recordId }).lean()
   },
 
+  findLatestNested: async (filter: {
+    ownerUserId: string
+    metric: MetricName
+    date?: string
+    arrayPath: string
+    timestampField: string
+  }) => {
+    const MetricModel = await getMetricModel(filter.metric)
+    const measurementPath = `data.${filter.arrayPath}`
+    const timestampPath = `${measurementPath}.${filter.timestampField}`
+    const [document] = await MetricModel.aggregate<{
+      timestamp?: number
+      data: MetricRecord
+      updatedAt?: Date
+    }>([
+      {
+        $match: {
+          ownerUserId: filter.ownerUserId,
+          ...(filter.date ? { date: filter.date } : {}),
+        },
+      },
+      { $unwind: `$${measurementPath}` },
+      { $sort: { [timestampPath]: -1 } },
+      { $limit: 1 },
+      {
+        $project: {
+          _id: 0,
+          timestamp: `$${timestampPath}`,
+          data: `$${measurementPath}`,
+          updatedAt: 1,
+        },
+      },
+    ])
+
+    return document
+  },
+
   deleteAllByOwner: async (ownerUserId: string) => {
     const results = await Promise.all(
       metricNames.map(async (metric) => {
