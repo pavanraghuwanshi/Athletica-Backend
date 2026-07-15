@@ -588,7 +588,7 @@ All paths use the `/api/admin-access` base and require a bearer token.
   { "email": "user@example.com" }
   ```
 
-  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again for the same pending connection resends a fresh OTP up to 3 times after the first send, then holds resends for 10 minutes.
+  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again reuses the same pending request and sends a fresh OTP. Five OTP sends are allowed, followed by a 10-minute cooldown; sending is available again after the cooldown. An already-active connection returns success without sending another OTP.
 
 - `POST /api/admin-access/requests` - request access to another user's health data.
 
@@ -598,7 +598,7 @@ All paths use the `/api/admin-access` base and require a bearer token.
 
 - `GET /api/admin-access/requests/sent` - list requests sent by the authenticated user. No request payload.
 - `GET /api/admin-access/requests/received` - list requests received by the authenticated user. No request payload.
-- `POST /api/admin-access/requests/:id/accept` - data owner accepts the request and receives a six-digit OTP in the response. No request payload.
+- `POST /api/admin-access/requests/:id/accept` - data owner accepts the request and receives a six-digit OTP in the response. The same request can issue up to five OTPs before a 10-minute cooldown. No request payload.
 - `POST /api/admin-access/requests/:id/reject` - data owner rejects a pending request. No request payload.
 - `POST /api/admin-access/requests/:id/verify-otp` - original requester verifies the OTP.
 

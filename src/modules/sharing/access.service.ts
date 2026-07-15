@@ -19,7 +19,13 @@ const generateOtp = () => {
 
 const OTP_TTL_MS = 10 * 60 * 1000
 const OTP_HOLD_MS = 10 * 60 * 1000
-const MAX_OTP_SENDS_BEFORE_HOLD = 4
+const MAX_OTP_SENDS_BEFORE_HOLD = 5
+
+type OtpRequestState = {
+  id: string
+  otpSendCount?: number | null
+  otpHoldUntil?: Date | null
+}
 
 const toResponse = async (request: {
   id: string
@@ -63,6 +69,69 @@ const sendConnectionOtpEmail = async (ownerEmail: string, requester: AuthUserRes
   })
 }
 
+const getNextOtpSendState = async (request: OtpRequestState) => {
+  const now = Date.now()
+
+  if (request.otpHoldUntil && request.otpHoldUntil.getTime() > now) {
+    const retryAfterSeconds = Math.ceil((request.otpHoldUntil.getTime() - now) / 1000)
+    throw new AuthError(`OTP resend limit reached; try again after ${retryAfterSeconds} seconds`, 429)
+  }
+
+  const otpSendCount = request.otpHoldUntil ? 0 : request.otpSendCount ?? 0
+
+  if (otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD) {
+    const otpHoldUntil = new Date(now + OTP_HOLD_MS)
+    await accessStore.update(request.id, { otpHoldUntil })
+    throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
+  }
+
+  const nextOtpSendCount = otpSendCount + 1
+
+  return {
+    otpSendCount: nextOtpSendCount,
+    otpHoldUntil: nextOtpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD ? new Date(now + OTP_HOLD_MS) : undefined,
+  }
+}
+
+const getOtpSentMessage = (otpSendCount: number) => {
+  return otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD
+    ? 'OTP sent. Five sends used; resends are available again after 10 minutes.'
+    : 'OTP sent. It expires in 10 minutes.'
+}
+
+const sendConnectionOtp = async (
+  request: OtpRequestState,
+  requester: AuthUserResponse,
+  ownerEmail: string,
+  deleteRequestOnFailure = false,
+) => {
+  const sendState = await getNextOtpSendState(request)
+  const otp = generateOtp()
+  const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
+
+  try {
+    await sendConnectionOtpEmail(ownerEmail, requester, otp)
+  } catch {
+    if (deleteRequestOnFailure) {
+      await accessStore.deleteById(request.id)
+    }
+
+    throw new AuthError('Unable to send OTP email', 502)
+  }
+
+  const updated = await accessStore.update(request.id, {
+    status: 'otpPending',
+    otpHash: await hashOtp(request.id, otp),
+    otpExpiresAt,
+    ...sendState,
+  })
+
+  return {
+    request: await toResponse(updated!),
+    message: getOtpSentMessage(sendState.otpSendCount),
+  }
+}
+
 export const accessService = {
   connectByEmail: async (requester: AuthUserResponse, ownerEmailInput?: string) => {
     const ownerEmail = normalizeEmail(ownerEmailInput)
@@ -84,73 +153,18 @@ export const accessService = {
     const existing = await accessStore.findOpen(requester.id, owner.id)
 
     if (existing) {
-      if (existing.status === 'otpPending') {
-        const now = Date.now()
-
-        if (existing.otpHoldUntil && existing.otpHoldUntil.getTime() > now) {
-          throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
-        }
-
-        const currentSendCount =
-          existing.otpHoldUntil && existing.otpHoldUntil.getTime() <= now ? 0 : existing.otpSendCount ?? 0
-
-        if (currentSendCount >= MAX_OTP_SENDS_BEFORE_HOLD) {
-          const otpHoldUntil = new Date(now + OTP_HOLD_MS)
-          await accessStore.update(existing.id, { otpHoldUntil })
-          throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
-        }
-
-        const otp = generateOtp()
-        const otpExpiresAt = new Date(now + OTP_TTL_MS)
-        const otpSendCount = currentSendCount + 1
-        const otpHoldUntil = otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD ? new Date(now + OTP_HOLD_MS) : undefined
-        const updated = await accessStore.update(existing.id, {
-          otpHash: await hashOtp(existing.id, otp),
-          otpExpiresAt,
-          otpSendCount,
-          otpHoldUntil,
-        })
-
-        try {
-          await sendConnectionOtpEmail(owner.email, requester, otp)
-        } catch {
-          throw new AuthError('Unable to send OTP email', 502)
-        }
-
+      if (existing.status === 'active') {
         return {
-          request: await toResponse(updated!),
-          message:
-            otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD
-              ? 'OTP sent to the user email. Resend limit reached; try again after 10 minutes.'
-              : 'OTP sent to the user email. It expires in 10 minutes.',
+          request: await toResponse(existing),
+          message: 'Access is already active for this user.',
         }
       }
 
-      throw new AuthError('An open or active request already exists for this user', 409)
+      return sendConnectionOtp(existing, requester, owner.email)
     }
 
     const request = await accessStore.create(requester.id, owner.id)
-    const otp = generateOtp()
-    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
-    const updated = await accessStore.update(request.id, {
-      status: 'otpPending',
-      otpHash: await hashOtp(request.id, otp),
-      otpExpiresAt,
-      otpSendCount: 1,
-      otpHoldUntil: undefined,
-    })
-
-    try {
-      await sendConnectionOtpEmail(owner.email, requester, otp)
-    } catch {
-      await accessStore.deleteById(request.id)
-      throw new AuthError('Unable to send OTP email', 502)
-    }
-
-    return {
-      request: await toResponse(updated!),
-      message: 'OTP sent to the user email. It expires in 10 minutes.',
-    }
+    return sendConnectionOtp(request, requester, owner.email, true)
   },
 
   requestAccess: async (requester: AuthUserResponse, ownerEmailInput?: string) => {
@@ -173,7 +187,7 @@ export const accessService = {
     const existing = await accessStore.findOpen(requester.id, owner.id)
 
     if (existing) {
-      throw new AuthError('An open or active request already exists for this user', 409)
+      return toResponse(existing)
     }
 
     return toResponse(await accessStore.create(requester.id, owner.id))
@@ -186,24 +200,27 @@ export const accessService = {
       throw new AuthError('Access request not found', 404)
     }
 
-    if (request.status !== 'pending') {
-      throw new AuthError('Only pending requests can be accepted', 409)
+    if (!['pending', 'otpPending'].includes(request.status)) {
+      throw new AuthError('Only pending requests can receive an OTP', 409)
     }
 
+    const sendState = await getNextOtpSendState(request)
     const otp = generateOtp()
     const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
     const updated = await accessStore.update(request.id, {
       status: 'otpPending',
       otpHash: await hashOtp(request.id, otp),
       otpExpiresAt,
-      otpSendCount: 1,
-      otpHoldUntil: undefined,
+      ...sendState,
     })
 
     return {
       request: await toResponse(updated!),
       otp,
-      message: 'Share this OTP with the requesting user. It expires in 10 minutes.',
+      message:
+        sendState.otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD
+          ? 'Share this OTP with the requester. Five sends used; another OTP is available after 10 minutes.'
+          : 'Share this OTP with the requesting user. It expires in 10 minutes.',
     }
   },
 
