@@ -19,15 +19,6 @@ const validateDate = (value: string | undefined, field: string) => {
   }
 }
 
-const getTodayDate = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
-}
-
 const getTimestamp = (metric: MetricName, record: MetricRecord) => {
   for (const field of metricTimestampFields[metric]) {
     const value = record[field]
@@ -380,22 +371,32 @@ export const metricService = {
   },
 
   overview: async (viewer: AuthUserResponse, ownerUserId: string, dateInput?: string) => {
-    const date = dateInput?.trim() || getTodayDate()
+    const date = dateInput?.trim() || undefined
     validateDate(date, 'date')
     const owner = await resolveOwner(viewer, { ownerUserId })
     const entries = await Promise.all(
       metricNames.map(async (metric) => {
-        const [document] = await metricStore.find({ ownerUserId: owner.id, metric, date, limit: 1 })
+        const [document] = await metricStore.find({
+          ownerUserId: owner.id,
+          metric,
+          ...(date ? { date } : {}),
+          limit: 1,
+        })
 
         return [metric, document] as const
       }),
     )
-    const overview = buildOverview(Object.fromEntries(entries))
+    const documents = Object.fromEntries(entries) as Partial<Record<MetricName, MetricDocumentLike>>
+    const latestRecords = Object.fromEntries(
+      metricNames.map((metric) => [metric, documents[metric]?.data ?? null]),
+    ) as Record<MetricName, MetricRecord | null>
+    const overview = buildOverview(documents)
 
     return {
       ownerUserId: owner.id,
       ownerEmail: owner.email,
-      date,
+      ...(date ? { date } : {}),
+      latestRecords,
       ...overview,
     }
   },
