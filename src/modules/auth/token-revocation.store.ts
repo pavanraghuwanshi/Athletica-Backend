@@ -4,7 +4,6 @@ import { connectDatabase } from '../../config/db'
 type TokenRevocation = {
   tokenHash: string
   userId: string
-  expiresAt: Date
   createdAt: Date
 }
 
@@ -19,12 +18,10 @@ const getTokenRevocationModel = async () => {
       {
         tokenHash: { type: String, required: true, unique: true },
         userId: { type: String, required: true, index: true },
-        expiresAt: { type: Date, required: true },
       },
       { collection: 'revoked_auth_tokens', timestamps: { createdAt: true, updatedAt: false }, versionKey: false },
     )
 
-    schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
     tokenRevocationModel =
       (mongoose.models.RevokedAuthToken as Model<TokenRevocationDocument> | undefined) ||
       mongoose.model<TokenRevocationDocument>('RevokedAuthToken', schema)
@@ -34,18 +31,18 @@ const getTokenRevocationModel = async () => {
 }
 
 export const tokenRevocationStore = {
-  revoke: async (tokenHash: string, userId: string, expiresAt: Date) => {
+  revoke: async (tokenHash: string, userId: string) => {
     const TokenRevocationModel = await getTokenRevocationModel()
     await TokenRevocationModel.updateOne(
       { tokenHash },
-      { $set: { tokenHash, userId, expiresAt } },
+      { $set: { tokenHash, userId }, $unset: { expiresAt: 1 } },
       { upsert: true },
     )
   },
 
   isRevoked: async (tokenHash: string) => {
     const TokenRevocationModel = await getTokenRevocationModel()
-    return Boolean(await TokenRevocationModel.exists({ tokenHash, expiresAt: { $gt: new Date() } }))
+    return Boolean(await TokenRevocationModel.exists({ tokenHash }))
   },
 
   deleteByUserId: async (userId: string) => {

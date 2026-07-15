@@ -93,7 +93,7 @@ Base path: `/api/auth`
   POST /api/auth/logout
   Authorization: Bearer <token>
   ```
-  The current JWT is revoked until its original expiry and cannot be used again.
+  JWTs do not expire automatically. Logout permanently revokes the current JWT so it cannot be used again.
 - `DELETE /api/auth/account` - permanently delete the authenticated account and associated data.
   ```http
   DELETE /api/auth/account

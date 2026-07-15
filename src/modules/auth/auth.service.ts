@@ -16,8 +16,6 @@ import { metricStore } from '../metrics/metric.store'
 import { accessStore } from '../sharing/access.store'
 import { adminGroupStore } from '../admin-groups/admin-group.store'
 
-const tokenExpiresInSeconds = 60 * 60 * 24 * 7
-
 type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 502
 
 type GoogleTokenInfo = {
@@ -98,7 +96,6 @@ const createToken = async (user: User) => {
       sub: user.id,
       email: user.email,
       iat: now,
-      exp: now + tokenExpiresInSeconds,
     },
     env.jwtSecret,
   )
@@ -260,11 +257,11 @@ const getVerifiedTokenPayload = async (token: string) => {
   try {
     const payload = await verify(token, env.jwtSecret, 'HS256')
 
-    if (typeof payload.sub !== 'string' || typeof payload.exp !== 'number') {
+    if (typeof payload.sub !== 'string') {
       throw new AuthError('Invalid token', 401)
     }
 
-    return { userId: payload.sub, expiresAt: new Date(payload.exp * 1000) }
+    return { userId: payload.sub }
   } catch (error) {
     if (error instanceof AuthError) {
       throw error
@@ -571,8 +568,8 @@ export const authService = {
   },
 
   logout: async (token: string) => {
-    const { userId, expiresAt } = await getVerifiedTokenPayload(token)
-    await tokenRevocationStore.revoke(await hashToken(token), userId, expiresAt)
+    const { userId } = await getVerifiedTokenPayload(token)
+    await tokenRevocationStore.revoke(await hashToken(token), userId)
 
     return { message: 'Logged out successfully' }
   },
