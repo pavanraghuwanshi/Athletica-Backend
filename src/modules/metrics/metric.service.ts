@@ -90,11 +90,11 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
 
     await ensureOwnerAccess(viewer, owner)
 
-    return { id: owner.id, email: owner.email }
+    return { id: owner.id, name: owner.name, email: owner.email, picture: owner.picture }
   }
 
   if (!normalizedOwnerEmail || normalizedOwnerEmail === viewer.email) {
-    return { id: viewer.id, email: viewer.email }
+    return { id: viewer.id, name: viewer.name, email: viewer.email, picture: viewer.picture }
   }
 
   const owner = await userStore.findByEmail(normalizedOwnerEmail)
@@ -105,7 +105,7 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
 
   await ensureOwnerAccess(viewer, owner)
 
-  return { id: owner.id, email: owner.email }
+  return { id: owner.id, name: owner.name, email: owner.email, picture: owner.picture }
 }
 
 const asNumber = (value: unknown) => {
@@ -232,8 +232,8 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     {
       key: 'sleep',
       title: 'Sleep',
-      value: formatMinutes(sleepMinutes || undefined),
-      meta: { totalMinutes: sleepMinutes || undefined },
+      value: formatMinutes(sleepMinutes),
+      meta: { totalMinutes: sleepMinutes },
       updatedAt: getUpdatedAt(documents.sleep),
     },
     {
@@ -253,7 +253,12 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     {
       key: 'ecg',
       title: 'ECG',
-      value: ecg ? (asNumber(ecg.success) === 1 ? 'Normal' : 'Review') : undefined,
+      value:
+        asNumber(ecg?.success) === 1
+          ? 'Normal'
+          : asNumber(ecg?.success) === 0
+            ? 'Review'
+            : undefined,
       updatedAt: getUpdatedAt(documents.ecg),
     },
     {
@@ -286,15 +291,25 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
     },
   ]
   const activity = {
-    steps: asNumber(pedometer?.steps) ?? asNumber(pedometer?.total_steps),
-    caloriesKcal: asNumber(pedometer?.caloriesKcal) ?? asNumber(pedometer?.calories_kcal),
-    distanceMeters: asNumber(pedometer?.distanceMeters) ?? asNumber(pedometer?.distance_meters),
-    updatedAt: getUpdatedAt(documents.pedometer),
+    steps: asNumber(pedometer?.steps) ?? asNumber(pedometer?.total_steps) ?? null,
+    caloriesKcal: asNumber(pedometer?.caloriesKcal) ?? asNumber(pedometer?.calories_kcal) ?? null,
+    distanceMeters: asNumber(pedometer?.distanceMeters) ?? asNumber(pedometer?.distance_meters) ?? null,
+    updatedAt: getUpdatedAt(documents.pedometer) ?? null,
   }
+  const normalizedCards = cards.map((card) => ({
+    ...card,
+    value: card.value ?? null,
+    unit: ('unit' in card ? card.unit : null) ?? null,
+    meta:
+      'meta' in card && card.meta
+        ? Object.fromEntries(Object.entries(card.meta).map(([key, value]) => [key, value ?? null]))
+        : null,
+    updatedAt: card.updatedAt ?? null,
+  }))
 
   return {
-    healthScore: getHealthScore(cards),
-    cards,
+    healthScore: getHealthScore(cards) ?? null,
+    cards: normalizedCards,
     activity,
   }
 }
@@ -385,7 +400,9 @@ export const metricService = {
     return {
       ownerUserId: owner.id,
       ownerEmail: owner.email,
-      ...(date ? { date } : {}),
+      name: owner.name,
+      picture: owner.picture ?? null,
+      date: date ?? null,
       latestRecords,
       ...overview,
     }
