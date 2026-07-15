@@ -140,6 +140,14 @@ const asNumber = (value: unknown) => {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+const asRecord = (value: unknown) => {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as MetricRecord) : undefined
+}
+
+const asArray = (value: unknown) => {
+  return Array.isArray(value) ? value : []
+}
+
 const formatMinutes = (minutes?: number) => {
   if (minutes === undefined) {
     return undefined
@@ -182,6 +190,126 @@ const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timest
   stress: { arrayPath: 'stress_json.samples', timestampField: 'timestamp' },
   met: { arrayPath: 'met_json.samples', timestampField: 'timestamp' },
   sportsWorkout: { arrayPath: 'samples_json', timestampField: 'timestamp' },
+}
+
+type MetricMergeConfig = {
+  arrayKey: string
+  containerKey?: string
+  dailyRecord?: boolean
+  identityField: string
+  sortField: string
+}
+
+const metricMergeConfigs: Partial<Record<MetricName, MetricMergeConfig>> = {
+  pedometer: { arrayKey: 'hourly_json', identityField: 'timestamp', sortField: 'timestamp', dailyRecord: true },
+  sleep: {
+    containerKey: 'sleep_json',
+    arrayKey: 'sessions',
+    identityField: 'startTime',
+    sortField: 'endTime',
+    dailyRecord: true,
+  },
+  bloodOxygen: {
+    containerKey: 'blood_oxygen_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  bloodGlucose: {
+    containerKey: 'blood_glucose_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  bloodComponents: {
+    containerKey: 'blood_components_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  bodyTemperature: {
+    containerKey: 'body_temperature_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  hrv: {
+    containerKey: 'hrv_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  stress: {
+    containerKey: 'stress_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  met: {
+    containerKey: 'met_json',
+    arrayKey: 'samples',
+    identityField: 'timestamp',
+    sortField: 'timestamp',
+    dailyRecord: true,
+  },
+  sportsWorkout: { arrayKey: 'samples_json', identityField: 'timestamp', sortField: 'timestamp' },
+}
+
+const mergeTimedArrays = (existingValue: unknown, incomingValue: unknown, config: MetricMergeConfig) => {
+  const mergedItems = new Map<string, unknown>()
+
+  for (const item of [...asArray(existingValue), ...asArray(incomingValue)]) {
+    const record = asRecord(item)
+    const identity = record?.[config.identityField]
+    const key = identity !== undefined ? `timestamp:${String(identity)}` : `value:${JSON.stringify(item)}`
+    mergedItems.set(key, item)
+  }
+
+  return [...mergedItems.values()].sort((left, right) => {
+    const leftValue = asNumber(asRecord(left)?.[config.sortField])
+    const rightValue = asNumber(asRecord(right)?.[config.sortField])
+
+    if (leftValue === undefined || rightValue === undefined) {
+      return 0
+    }
+
+    return leftValue - rightValue
+  })
+}
+
+const mergeMetricRecord = (metric: MetricName, existing: MetricRecord | undefined, incoming: MetricRecord) => {
+  const config = metricMergeConfigs[metric]
+
+  if (!config) {
+    return incoming
+  }
+
+  const mergedRecord: MetricRecord = { ...existing, ...incoming }
+  const existingContainer = config.containerKey ? asRecord(existing?.[config.containerKey]) : existing
+  const incomingContainer = config.containerKey ? asRecord(incoming[config.containerKey]) : incoming
+  const mergedArray = mergeTimedArrays(
+    existingContainer?.[config.arrayKey],
+    incomingContainer?.[config.arrayKey],
+    config,
+  )
+
+  if (config.containerKey) {
+    mergedRecord[config.containerKey] = {
+      ...existingContainer,
+      ...incomingContainer,
+      [config.arrayKey]: mergedArray,
+    }
+  } else {
+    mergedRecord[config.arrayKey] = mergedArray
+  }
+
+  return mergedRecord
 }
 
 const getHealthScore = (cards: Array<{ value?: number | string; key: string }>) => {
@@ -345,16 +473,45 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
 export const metricService = {
   save: async (metric: MetricName, user: AuthUserResponse, body: unknown) => {
     const records = normalizeRecords(body)
-    const storedRecords = records.map((record) => {
-      const timestamp = getTimestamp(metric, record)
+    const incomingRecords = new Map<
+      string,
+      { recordId: string; date: string; timestamp?: number; data: MetricRecord }
+    >()
 
+    for (const record of records) {
+      const timestamp = getTimestamp(metric, record)
+      const date = getRecordDate(record, timestamp)
+      const recordId = metricMergeConfigs[metric]?.dailyRecord ? date : String(record.id)
+      const previousIncoming = incomingRecords.get(recordId)
+
+      incomingRecords.set(recordId, {
+        recordId,
+        date,
+        timestamp:
+          previousIncoming?.timestamp !== undefined && timestamp !== undefined
+            ? Math.max(previousIncoming.timestamp, timestamp)
+            : timestamp ?? previousIncoming?.timestamp,
+        data: mergeMetricRecord(metric, previousIncoming?.data, record),
+      })
+    }
+
+    const preparedRecords = [...incomingRecords.values()]
+    const existingDocuments = metricMergeConfigs[metric]
+      ? await metricStore.findByRecordIds(
+          user.id,
+          metric,
+          preparedRecords.map((record) => record.recordId),
+        )
+      : []
+    const existingByRecordId = new Map(existingDocuments.map((document) => [document.recordId, document.data]))
+    const storedRecords = preparedRecords.map((record) => {
       return {
         ownerUserId: user.id,
         metric,
-        recordId: String(record.id),
-        date: getRecordDate(record, timestamp),
-        timestamp,
-        data: record,
+        recordId: record.recordId,
+        date: record.date,
+        timestamp: record.timestamp,
+        data: mergeMetricRecord(metric, existingByRecordId.get(record.recordId), record.data),
       }
     })
 

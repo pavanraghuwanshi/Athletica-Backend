@@ -208,6 +208,8 @@ Content-Type: application/json
 - Empty or missing arrays are skipped.
 - At least one metric array must contain a record.
 - Records always belong to the authenticated user.
+- A user can sync repeatedly during the same day. Daily metrics stay in one date document, and nested readings are merged, deduplicated, and ordered by their measurement timestamp instead of replacing earlier readings.
+- Direct measurements such as heart rate, blood pressure, body composition, and ECG remain separate records but share the same searchable `date`, so a date GET returns every reading in timestamp order.
 
 Example response:
 

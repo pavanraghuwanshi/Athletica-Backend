@@ -108,6 +108,19 @@ export const metricStore = {
     return MetricModel.findOne({ ownerUserId, recordId }).lean()
   },
 
+  findByRecordIds: async (ownerUserId: string, metric: MetricName, recordIds: string[]) => {
+    if (!recordIds.length) {
+      return []
+    }
+
+    const MetricModel = await getMetricModel(metric)
+
+    return MetricModel.find({
+      ownerUserId,
+      recordId: { $in: [...new Set(recordIds)] },
+    }).lean()
+  },
+
   findLatestNested: async (filter: {
     ownerUserId: string
     metric: MetricName
