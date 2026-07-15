@@ -118,23 +118,25 @@ FRONTEND_AUTH_REDIRECT_URL=http://localhost:5173/auth/callback
 SUPER_ADMIN_EMAIL=superadmin@example.com
 ```
 
-Only the exact email in `SUPER_ADMIN_EMAIL` receives the global `superAdmin` role. Every other account keeps the `user` role. A consent-based data-admin relationship does not change either user's global role.
+Only the exact email in `SUPER_ADMIN_EMAIL` receives the global `superAdmin` role. Every other account starts with the `user` role. When a user verifies another user's OTP access request, the requester is promoted to the `admin` role and can connect multiple users.
 
 ## Users API
 
 All paths use the `/api/users` base and require a bearer token.
 
-- `GET /api/users` - list users visible to the authenticated account.
+- `GET /api/users?page=1&limit=20` - list users visible to the authenticated account.
   - `superAdmin` sees every user.
-  - Regular users see their own account plus users who verified OTP access for them.
+  - Regular users see their own account.
+  - `admin` users see their own account plus users who verified OTP access for them.
   - Each item includes `accessType`: `self`, `dataAdmin`, or `superAdmin`.
+  - `limit` defaults to `20` and has a maximum of `100`.
 - `GET /api/users/:id` - get one visible user by id.
 
-Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerEmail`. `superAdmin` can read any user's health data with `ownerEmail`.
+Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerUserId` or `ownerEmail`. `superAdmin` can read any user's health data with `ownerUserId` or `ownerEmail`.
 
 ## Admin groups API
 
-All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
+All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Only `admin` and `superAdmin` users can manage groups. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
 
 - `POST /api/admin-groups` - create a group.
   ```json
@@ -270,11 +272,12 @@ GET <metric-path>?date=2026-07-10
 GET <metric-path>?from=2026-07-01&to=2026-07-10&limit=500
 GET <metric-path>/<record-id>
 GET <metric-path>?ownerEmail=user@example.com&date=2026-07-10
+GET <metric-path>?ownerUserId=user-id&date=2026-07-10
 ```
 
 - `date`, `from`, and `to` use `yyyy-MM-dd`.
 - `limit` defaults to `500` and has a maximum of `5000`.
-- `ownerEmail` works after that user grants and verifies data-admin access. `superAdmin` can use any user's email.
+- `ownerUserId` or `ownerEmail` works after that user grants and verifies data-admin access. `superAdmin` can use any user's id or email.
 - GET endpoints have no JSON request body.
 
 ### Metric record payloads

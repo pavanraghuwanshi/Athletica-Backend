@@ -61,8 +61,31 @@ const normalizeRecords = (body: unknown) => {
   })
 }
 
-const resolveOwner = async (viewer: AuthUserResponse, ownerEmail?: string) => {
-  const normalizedOwnerEmail = ownerEmail?.trim().toLowerCase()
+const ensureOwnerAccess = async (viewer: AuthUserResponse, owner: { id: string; email: string }) => {
+  if (owner.id === viewer.id || viewer.role === 'superAdmin') {
+    return
+  }
+
+  if (!(await accessService.hasActiveAccess(viewer.id, owner.id))) {
+    throw new AuthError('The user has not made you their data admin', 403)
+  }
+}
+
+const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: string; ownerUserId?: string }) => {
+  const normalizedOwnerEmail = query.ownerEmail?.trim().toLowerCase()
+  const ownerUserId = query.ownerUserId?.trim()
+
+  if (ownerUserId) {
+    const owner = await userStore.findById(ownerUserId)
+
+    if (!owner) {
+      throw new AuthError('Data owner not found', 404)
+    }
+
+    await ensureOwnerAccess(viewer, owner)
+
+    return { id: owner.id, email: owner.email }
+  }
 
   if (!normalizedOwnerEmail || normalizedOwnerEmail === viewer.email) {
     return { id: viewer.id, email: viewer.email }
@@ -74,9 +97,7 @@ const resolveOwner = async (viewer: AuthUserResponse, ownerEmail?: string) => {
     throw new AuthError('Data owner not found', 404)
   }
 
-  if (viewer.role !== 'superAdmin' && !(await accessService.hasActiveAccess(viewer.id, owner.id))) {
-    throw new AuthError('The user has not made you their data admin', 403)
-  }
+  await ensureOwnerAccess(viewer, owner)
 
   return { id: owner.id, email: owner.email }
 }
@@ -105,27 +126,27 @@ export const metricService = {
   list: async (
     metric: MetricName,
     viewer: AuthUserResponse,
-    query: { ownerEmail?: string; date?: string; from?: string; to?: string; limit?: string },
+    query: { ownerEmail?: string; ownerUserId?: string; date?: string; from?: string; to?: string; limit?: string },
   ) => {
     validateDate(query.date, 'date')
     validateDate(query.from, 'from')
     validateDate(query.to, 'to')
-    const owner = await resolveOwner(viewer, query.ownerEmail)
+    const owner = await resolveOwner(viewer, query)
     const requestedLimit = Number(query.limit ?? 500)
     const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 5000) : 500
     const documents = await metricStore.find({ ownerUserId: owner.id, metric, ...query, limit })
 
-    return { metric, ownerEmail: owner.email, count: documents.length, records: documents.map((item) => item.data) }
+    return { metric, ownerUserId: owner.id, ownerEmail: owner.email, count: documents.length, records: documents.map((item) => item.data) }
   },
 
-  getById: async (metric: MetricName, viewer: AuthUserResponse, recordId: string, ownerEmail?: string) => {
-    const owner = await resolveOwner(viewer, ownerEmail)
+  getById: async (metric: MetricName, viewer: AuthUserResponse, recordId: string, query: { ownerEmail?: string; ownerUserId?: string }) => {
+    const owner = await resolveOwner(viewer, query)
     const document = await metricStore.findByRecordId(owner.id, metric, recordId)
 
     if (!document) {
       throw new AuthError('Health record not found', 404)
     }
 
-    return { metric, ownerEmail: owner.email, record: document.data }
+    return { metric, ownerUserId: owner.id, ownerEmail: owner.email, record: document.data }
   },
 }

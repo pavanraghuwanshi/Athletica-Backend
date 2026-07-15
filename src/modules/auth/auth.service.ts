@@ -240,6 +240,17 @@ const getRoleForEmail = (email: string) => {
   return env.superAdminEmail && email === env.superAdminEmail ? 'superAdmin' : 'user'
 }
 
+const syncConfiguredRole = (user: User) => {
+  if (env.superAdminEmail && user.email === env.superAdminEmail) {
+    user.role = 'superAdmin'
+    return
+  }
+
+  if (user.role === 'superAdmin') {
+    user.role = 'user'
+  }
+}
+
 const hashToken = async (token: string) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -413,7 +424,7 @@ export const authService = {
       existingUser.passwordHash = passwordHash
       existingUser.providers = addProvider(existingUser.providers, 'email')
       existingUser.updatedAt = now
-      existingUser.role = getRoleForEmail(email)
+      syncConfiguredRole(existingUser)
 
       return createAuthResponse(await userStore.save(existingUser))
     }
@@ -452,10 +463,10 @@ export const authService = {
       throw new AuthError('Invalid email or password', 401)
     }
 
-    const configuredRole = getRoleForEmail(email)
+    const currentRole = user.role
+    syncConfiguredRole(user)
 
-    if (user.role !== configuredRole) {
-      user.role = configuredRole
+    if (user.role !== currentRole) {
       user.updatedAt = new Date().toISOString()
 
       return createAuthResponse(await userStore.save(user))
@@ -476,7 +487,7 @@ export const authService = {
       existingUser.picture = picture || existingUser.picture
       existingUser.providers = addProvider(existingUser.providers, 'google')
       existingUser.updatedAt = now
-      existingUser.role = getRoleForEmail(email)
+      syncConfiguredRole(existingUser)
 
       return createAuthResponse(await userStore.save(existingUser))
     }
@@ -507,7 +518,7 @@ export const authService = {
       existingAppleUser.appleId = appleId
       existingAppleUser.providers = addProvider(existingAppleUser.providers, 'apple')
       existingAppleUser.updatedAt = now
-      existingAppleUser.role = getRoleForEmail(existingAppleUser.email)
+      syncConfiguredRole(existingAppleUser)
 
       return createAuthResponse(await userStore.save(existingAppleUser))
     }
@@ -523,7 +534,7 @@ export const authService = {
       existingEmailUser.appleId = appleId
       existingEmailUser.providers = addProvider(existingEmailUser.providers, 'apple')
       existingEmailUser.updatedAt = now
-      existingEmailUser.role = getRoleForEmail(email)
+      syncConfiguredRole(existingEmailUser)
 
       return createAuthResponse(await userStore.save(existingEmailUser))
     }

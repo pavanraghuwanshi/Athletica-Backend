@@ -19,6 +19,12 @@ const normalizeMemberIds = async (admin: AuthUserResponse, memberUserIds?: strin
   return usersService.ensureVisibleUserIds(admin, memberUserIds.map((id) => id.trim()))
 }
 
+const ensureAdminRole = (admin: AuthUserResponse) => {
+  if (!['admin', 'superAdmin'].includes(admin.role)) {
+    throw new AuthError('Only admins can manage groups', 403)
+  }
+}
+
 const toResponse = async (group: AdminGroup) => {
   const members = await userStore.listByIds(group.memberUserIds)
 
@@ -52,6 +58,8 @@ const getOwnedGroup = async (admin: AuthUserResponse, groupId: string) => {
 
 export const adminGroupService = {
   create: async (admin: AuthUserResponse, input: AdminGroupInput) => {
+    ensureAdminRole(admin)
+
     const name = normalizeText(input.name)
 
     if (!name) {
@@ -69,14 +77,20 @@ export const adminGroupService = {
   },
 
   list: async (admin: AuthUserResponse) => {
+    ensureAdminRole(admin)
+
     return Promise.all((await adminGroupStore.listByAdmin(admin.id)).map(toResponse))
   },
 
   get: async (admin: AuthUserResponse, groupId: string) => {
+    ensureAdminRole(admin)
+
     return toResponse(await getOwnedGroup(admin, groupId))
   },
 
   update: async (admin: AuthUserResponse, groupId: string, input: AdminGroupInput) => {
+    ensureAdminRole(admin)
+
     await getOwnedGroup(admin, groupId)
 
     const name = input.name === undefined ? undefined : normalizeText(input.name)
@@ -95,6 +109,8 @@ export const adminGroupService = {
   },
 
   remove: async (admin: AuthUserResponse, groupId: string) => {
+    ensureAdminRole(admin)
+
     await getOwnedGroup(admin, groupId)
     await adminGroupStore.deleteById(groupId)
 

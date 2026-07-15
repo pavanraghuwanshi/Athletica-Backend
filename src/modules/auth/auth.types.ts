@@ -1,5 +1,5 @@
 export type AuthProvider = 'email' | 'google' | 'apple'
-export type UserRole = 'user' | 'superAdmin'
+export type UserRole = 'user' | 'admin' | 'superAdmin'
 
 export type User = {
   id: string

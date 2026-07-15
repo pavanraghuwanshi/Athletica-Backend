@@ -20,7 +20,7 @@ const getUserModel = async () => {
         googleId: { type: String, sparse: true },
         appleId: { type: String, sparse: true },
         providers: { type: [String], required: true },
-        role: { type: String, enum: ['user', 'superAdmin'], required: true, default: 'user' },
+        role: { type: String, enum: ['user', 'admin', 'superAdmin'], required: true, default: 'user' },
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
       },
@@ -48,7 +48,7 @@ const toUser = (document: UserDocument | null) => {
     },
   })
 
-  if (user && user.role !== 'superAdmin') {
+  if (user && !['admin', 'superAdmin'].includes(user.role)) {
     user.role = 'user'
   }
 
@@ -107,6 +107,14 @@ export const userStore = {
     })
 
     return toUser(document) ?? normalizedUser
+  },
+
+  setRole: async (id: string, role: User['role']) => {
+    const UserModel = await getUserModel()
+    const updatedAt = new Date().toISOString()
+    const document = await UserModel.findOneAndUpdate({ id }, { role, updatedAt }, { new: true })
+
+    return toUser(document)
   },
 
   deleteById: async (id: string) => {

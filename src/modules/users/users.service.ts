@@ -30,6 +30,29 @@ export const usersService = {
     return users.map((user) => toVisibleUser(user, user.id === viewer.id ? 'self' : 'dataAdmin'))
   },
 
+  listVisiblePage: async (viewer: AuthUserResponse, query: { page?: string; limit?: string }) => {
+    const requestedPage = Number(query.page ?? 1)
+    const requestedLimit = Number(query.limit ?? 20)
+    const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1
+    const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20
+    const users = await usersService.listVisible(viewer)
+    const total = users.length
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const offset = (page - 1) * limit
+
+    return {
+      users: users.slice(offset, offset + limit),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    }
+  },
+
   getVisibleById: async (viewer: AuthUserResponse, userId: string) => {
     const users = await usersService.listVisible(viewer)
     const user = users.find((candidate) => candidate.id === userId)

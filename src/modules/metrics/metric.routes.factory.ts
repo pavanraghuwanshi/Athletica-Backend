@@ -33,6 +33,7 @@ export const createMetricRoutes = (metric: MetricName) => {
       return context.json(
         await metricService.list(metric, user, {
           ownerEmail: context.req.query('ownerEmail'),
+          ownerUserId: context.req.query('ownerUserId'),
           date: context.req.query('date'),
           from: context.req.query('from'),
           to: context.req.query('to'),
@@ -48,7 +49,10 @@ export const createMetricRoutes = (metric: MetricName) => {
     try {
       const user = await getAuthenticatedUser(context)
       return context.json(
-        await metricService.getById(metric, user, context.req.param('id'), context.req.query('ownerEmail')),
+        await metricService.getById(metric, user, context.req.param('id'), {
+          ownerEmail: context.req.query('ownerEmail'),
+          ownerUserId: context.req.query('ownerUserId'),
+        }),
       )
     } catch (error) {
       return handleError(context, error)

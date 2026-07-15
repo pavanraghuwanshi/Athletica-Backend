@@ -14,7 +14,12 @@ const handleError = (context: Context, error: unknown) => {
 export const usersController = {
   list: async (context: Context) => {
     try {
-      return context.json({ users: await usersService.listVisible(await getAuthenticatedUser(context)) })
+      return context.json(
+        await usersService.listVisiblePage(await getAuthenticatedUser(context), {
+          page: context.req.query('page'),
+          limit: context.req.query('limit'),
+        }),
+      )
     } catch (error) {
       return handleError(context, error)
     }

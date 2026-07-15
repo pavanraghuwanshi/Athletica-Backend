@@ -247,6 +247,10 @@ export const accessService = {
       throw new AuthError('Invalid OTP', 401)
     }
 
+    if (requester.role === 'user') {
+      await userStore.setRole(requester.id, 'admin')
+    }
+
     return toResponse((await accessStore.update(request.id, {
       status: 'active',
       otpHash: undefined,
