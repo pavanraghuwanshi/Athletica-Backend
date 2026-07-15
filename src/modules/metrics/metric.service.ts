@@ -13,10 +13,18 @@ type MetricDocumentLike = {
   data: MetricRecord
 }
 
-const validateDate = (value: string | undefined, field: string) => {
-  if (value && !datePattern.test(value)) {
+const parseDate = (value: string | undefined, field: string) => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  const normalizedValue = value.trim()
+
+  if (!datePattern.test(normalizedValue)) {
     throw new AuthError(`${field} must use yyyy-MM-dd format`, 400)
   }
+
+  return normalizedValue
 }
 
 const getTimestamp = (metric: MetricName, record: MetricRecord) => {
@@ -93,7 +101,27 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
     return { id: owner.id, name: owner.name, email: owner.email, picture: owner.picture }
   }
 
-  if (!normalizedOwnerEmail || normalizedOwnerEmail === viewer.email) {
+  if (normalizedOwnerEmail === viewer.email) {
+    return { id: viewer.id, name: viewer.name, email: viewer.email, picture: viewer.picture }
+  }
+
+  if (!normalizedOwnerEmail) {
+    if (viewer.role === 'admin') {
+      const activeOwnerIds = await accessService.listActiveOwnerIds(viewer.id)
+
+      if (activeOwnerIds.length === 1) {
+        const owner = await userStore.findById(activeOwnerIds[0])
+
+        if (owner) {
+          return { id: owner.id, name: owner.name, email: owner.email, picture: owner.picture }
+        }
+      }
+
+      if (activeOwnerIds.length > 1) {
+        throw new AuthError('ownerUserId or ownerEmail is required when multiple users are connected', 400)
+      }
+    }
+
     return { id: viewer.id, name: viewer.name, email: viewer.email, picture: viewer.picture }
   }
 
@@ -340,13 +368,22 @@ export const metricService = {
     viewer: AuthUserResponse,
     query: { ownerEmail?: string; ownerUserId?: string; date?: string; from?: string; to?: string; limit?: string },
   ) => {
-    validateDate(query.date, 'date')
-    validateDate(query.from, 'from')
-    validateDate(query.to, 'to')
+    const date = parseDate(query.date, 'date')
+    const from = parseDate(query.from, 'from')
+    const to = parseDate(query.to, 'to')
+
+    if (date && (from || to)) {
+      throw new AuthError('Use either date or from/to filters, not both', 400)
+    }
+
+    if (from && to && from > to) {
+      throw new AuthError('from must be earlier than or equal to to', 400)
+    }
+
     const owner = await resolveOwner(viewer, query)
     const requestedLimit = Number(query.limit ?? 500)
     const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 5000) : 500
-    const documents = await metricStore.find({ ownerUserId: owner.id, metric, ...query, limit })
+    const documents = await metricStore.find({ ownerUserId: owner.id, metric, date, from, to, limit })
 
     return { metric, ownerUserId: owner.id, ownerEmail: owner.email, count: documents.length, records: documents.map((item) => item.data) }
   },
@@ -363,8 +400,7 @@ export const metricService = {
   },
 
   overview: async (viewer: AuthUserResponse, ownerUserId: string, dateInput?: string) => {
-    const date = dateInput?.trim() || undefined
-    validateDate(date, 'date')
+    const date = parseDate(dateInput, 'date')
     const owner = await resolveOwner(viewer, { ownerUserId })
     const entries = await Promise.all(
       metricNames.map(async (metric) => {

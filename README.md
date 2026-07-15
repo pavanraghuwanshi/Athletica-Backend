@@ -282,8 +282,10 @@ GET <metric-path>?ownerUserId=user-id&date=2026-07-10
 ```
 
 - `date`, `from`, and `to` use `yyyy-MM-dd`.
+- Use an equals sign when filtering, for example `?date=2026-07-14` (not `?date,`).
 - `limit` defaults to `500` and has a maximum of `5000`.
 - `ownerUserId` or `ownerEmail` works after that user grants and verifies data-admin access. `superAdmin` can use any user's id or email.
+- An admin with exactly one connected user automatically reads that user's metrics when no owner parameter is supplied. Admins with multiple connected users must pass `ownerUserId` or `ownerEmail`.
 - GET endpoints have no JSON request body.
 
 ### Metric record payloads
