@@ -131,6 +131,12 @@ All paths use the `/api/users` base and require a bearer token.
   - Each item includes `accessType`: `self`, `dataAdmin`, or `superAdmin`.
   - `limit` defaults to `20` and has a maximum of `100`.
 - `GET /api/users/:id` - get one visible user by id.
+- `GET /api/users/:id/overview` - get dashboard summary cards for one visible user. Defaults to today's date; pass `?date=yyyy-MM-dd` for another day.
+  ```http
+  GET /api/users/user-id/overview
+  GET /api/users/user-id/overview?date=2026-07-10
+  ```
+  The response includes `healthScore`, normalized `cards`, and `activity` for the selected date. It is a summary API for dashboard screens, not a replacement for the single-metric detail APIs.
 
 Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerUserId` or `ownerEmail`. `superAdmin` can read any user's health data with `ownerUserId` or `ownerEmail`.
 
