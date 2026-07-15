@@ -3,13 +3,13 @@ import { userStore } from '../auth/auth.store'
 import { accessService } from '../sharing/access.service'
 import { AuthError } from '../auth/auth.service'
 import { metricStore } from './metric.store'
-import { metricTimestampFields, type MetricName, type MetricRecord } from './metric.types'
+import { metricNames, metricTimestampFields, type MetricName, type MetricRecord } from './metric.types'
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
 type MetricDocumentLike = {
   timestamp?: number
-  updatedAt?: Date
+  updatedAt?: Date | string
   data: MetricRecord
 }
 
@@ -133,7 +133,7 @@ const latestSample = (record: MetricRecord, containerKey: string) => {
   const container = asRecord(record[containerKey])
   const samples = asArray(container?.samples).filter(asRecord)
 
-  return samples.at(-1)
+  return samples.length ? samples[samples.length - 1] : undefined
 }
 
 const averageSamples = (record: MetricRecord, containerKey: string, sampleKey: string) => {
@@ -168,7 +168,15 @@ const getUpdatedAt = (document?: MetricDocumentLike) => {
     return new Date(document.timestamp).toISOString()
   }
 
-  return document.updatedAt?.toISOString()
+  if (document.updatedAt instanceof Date) {
+    return document.updatedAt.toISOString()
+  }
+
+  if (typeof document.updatedAt === 'string') {
+    return document.updatedAt
+  }
+
+  return undefined
 }
 
 const getHealthScore = (cards: Array<{ value?: number | string; key: string }>) => {

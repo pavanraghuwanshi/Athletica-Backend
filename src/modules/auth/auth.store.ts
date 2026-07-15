@@ -30,8 +30,6 @@ const getUserModel = async () => {
       },
     )
 
-    userSchema.index({ googleId: 1 }, { sparse: true })
-    userSchema.index({ appleId: 1 }, { sparse: true })
     userModel = mongoose.models.User || mongoose.model<UserDocument>('User', userSchema)
   }
 
