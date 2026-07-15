@@ -14,6 +14,7 @@ import { userStore } from './auth.store'
 import { tokenRevocationStore } from './token-revocation.store'
 import { metricStore } from '../metrics/metric.store'
 import { accessStore } from '../sharing/access.store'
+import { adminGroupStore } from '../admin-groups/admin-group.store'
 
 const tokenExpiresInSeconds = 60 * 60 * 24 * 7
 
@@ -574,6 +575,7 @@ export const authService = {
     const [healthRecordsDeleted] = await Promise.all([
       metricStore.deleteAllByOwner(user.id),
       accessStore.deleteByUserId(user.id),
+      adminGroupStore.deleteByUserId(user.id),
     ])
 
     await userStore.deleteById(user.id)

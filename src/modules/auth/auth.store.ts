@@ -56,6 +56,24 @@ const toUser = (document: UserDocument | null) => {
 }
 
 export const userStore = {
+  listAll: async () => {
+    const UserModel = await getUserModel()
+    const documents = await UserModel.find().sort({ createdAt: -1 })
+
+    return documents.map(toUser).filter((user): user is User => Boolean(user))
+  },
+
+  listByIds: async (ids: string[]) => {
+    if (!ids.length) {
+      return []
+    }
+
+    const UserModel = await getUserModel()
+    const documents = await UserModel.find({ id: { $in: [...new Set(ids)] } }).sort({ createdAt: -1 })
+
+    return documents.map(toUser).filter((user): user is User => Boolean(user))
+  },
+
   findByEmail: async (email: string) => {
     const UserModel = await getUserModel()
 

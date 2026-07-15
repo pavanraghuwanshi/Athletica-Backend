@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import { authRoutes } from '../modules/auth/auth.routes'
+import { usersRoutes } from '../modules/users/users.routes'
 import { healthRoutes } from '../modules/health/health.routes'
 import { heartRateRoutes } from '../modules/heart-rate/heart-rate.routes'
 import { pedometerRoutes } from '../modules/pedometer/pedometer.routes'
@@ -16,11 +17,13 @@ import { bodyCompositionRoutes } from '../modules/body-composition/body-composit
 import { ecgRoutes } from '../modules/ecg/ecg.routes'
 import { sportsWorkoutRoutes } from '../modules/sports-workout/sports-workout.routes'
 import { accessRoutes } from '../modules/sharing/access.routes'
+import { adminGroupRoutes } from '../modules/admin-groups/admin-group.routes'
 import { syncRoutes } from '../modules/sync/sync.routes'
 
 export const registerRoutes = (app: Hono) => {
   app.route('/api/', healthRoutes)
   app.route('/api/auth', authRoutes)
+  app.route('/api/users', usersRoutes)
   app.route('/api/bandpro/heart-rate', heartRateRoutes)
   app.route('/api/bandpro/pedometer', pedometerRoutes)
   app.route('/api/bandpro/sleep', sleepRoutes)
@@ -37,4 +40,5 @@ export const registerRoutes = (app: Hono) => {
   app.route('/api/bandpro/sports-workout', sportsWorkoutRoutes)
   app.route('/api/bandpro/sync', syncRoutes)
   app.route('/api/admin-access', accessRoutes)
+  app.route('/api/admin-groups', adminGroupRoutes)
 }

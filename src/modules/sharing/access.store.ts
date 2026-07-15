@@ -87,6 +87,11 @@ export const accessStore = {
     return AccessModel.find({ requesterUserId }).sort({ createdAt: -1 }).lean()
   },
 
+  listActiveByRequester: async (requesterUserId: string) => {
+    const AccessModel = await getAccessModel()
+    return AccessModel.find({ requesterUserId, status: 'active' }).sort({ createdAt: -1 }).lean()
+  },
+
   listByOwner: async (ownerUserId: string) => {
     const AccessModel = await getAccessModel()
     return AccessModel.find({ ownerUserId }).sort({ createdAt: -1 }).lean()

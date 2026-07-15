@@ -103,7 +103,7 @@ Base path: `/api/auth`
   ```json
   { "confirmation": "DELETE" }
   ```
-  This permanently deletes the user, all records from their 14 health collections, and every sent/received data-admin request or grant. The deleted user's JWTs stop working because the user no longer exists.
+  This permanently deletes the user, all records from their 14 health collections, every sent/received data-admin request or grant, and owned admin groups. The deleted user is also removed from other admin groups. The deleted user's JWTs stop working because the user no longer exists.
 
 Set these environment variables:
 
@@ -119,6 +119,31 @@ SUPER_ADMIN_EMAIL=superadmin@example.com
 ```
 
 Only the exact email in `SUPER_ADMIN_EMAIL` receives the global `superAdmin` role. Every other account keeps the `user` role. A consent-based data-admin relationship does not change either user's global role.
+
+## Users API
+
+All paths use the `/api/users` base and require a bearer token.
+
+- `GET /api/users` - list users visible to the authenticated account.
+  - `superAdmin` sees every user.
+  - Regular users see their own account plus users who verified OTP access for them.
+  - Each item includes `accessType`: `self`, `dataAdmin`, or `superAdmin`.
+- `GET /api/users/:id` - get one visible user by id.
+
+Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerEmail`. `superAdmin` can read any user's health data with `ownerEmail`.
+
+## Admin groups API
+
+All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
+
+- `POST /api/admin-groups` - create a group.
+  ```json
+  { "name": "Hockey Team", "sport": "hockey", "memberUserIds": ["user-id-1", "user-id-2"] }
+  ```
+- `GET /api/admin-groups` - list groups owned by the authenticated admin.
+- `GET /api/admin-groups/:id` - get one owned group.
+- `PATCH /api/admin-groups/:id` - update `name`, `sport`, or `memberUserIds`.
+- `DELETE /api/admin-groups/:id` - delete one owned group.
 
 ## Band Pro health APIs
 
@@ -249,7 +274,7 @@ GET <metric-path>?ownerEmail=user@example.com&date=2026-07-10
 
 - `date`, `from`, and `to` use `yyyy-MM-dd`.
 - `limit` defaults to `500` and has a maximum of `5000`.
-- `ownerEmail` works only after that user grants and verifies data-admin access.
+- `ownerEmail` works after that user grants and verifies data-admin access. `superAdmin` can use any user's email.
 - GET endpoints have no JSON request body.
 
 ### Metric record payloads
@@ -550,7 +575,7 @@ All paths use the `/api/admin-access` base and require a bearer token.
   { "email": "user@example.com" }
   ```
 
-  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again for the same pending connection resends a fresh OTP up to 3 sends, then holds resends for 10 minutes.
+  Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again for the same pending connection resends a fresh OTP up to 3 times after the first send, then holds resends for 10 minutes.
 
 - `POST /api/admin-access/requests` - request access to another user's health data.
 

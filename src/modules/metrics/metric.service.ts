@@ -74,7 +74,7 @@ const resolveOwner = async (viewer: AuthUserResponse, ownerEmail?: string) => {
     throw new AuthError('Data owner not found', 404)
   }
 
-  if (!(await accessService.hasActiveAccess(viewer.id, owner.id))) {
+  if (viewer.role !== 'superAdmin' && !(await accessService.hasActiveAccess(viewer.id, owner.id))) {
     throw new AuthError('The user has not made you their data admin', 403)
   }
 

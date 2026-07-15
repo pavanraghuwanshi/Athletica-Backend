@@ -19,7 +19,7 @@ const generateOtp = () => {
 
 const OTP_TTL_MS = 10 * 60 * 1000
 const OTP_HOLD_MS = 10 * 60 * 1000
-const MAX_OTP_SENDS_BEFORE_HOLD = 3
+const MAX_OTP_SENDS_BEFORE_HOLD = 4
 
 const toResponse = async (request: {
   id: string
@@ -273,6 +273,10 @@ export const accessService = {
 
   listSent: async (requester: AuthUserResponse) => {
     return Promise.all((await accessStore.listByRequester(requester.id)).map(toResponse))
+  },
+
+  listActiveOwnerIds: async (requesterUserId: string) => {
+    return (await accessStore.listActiveByRequester(requesterUserId)).map((request) => request.ownerUserId)
   },
 
   listReceived: async (owner: AuthUserResponse) => {
