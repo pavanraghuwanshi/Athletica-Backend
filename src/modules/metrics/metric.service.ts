@@ -180,7 +180,6 @@ const getUpdatedAt = (document?: MetricDocumentLike) => {
 }
 
 const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timestampField: string }>> = {
-  pedometer: { arrayPath: 'hourly_json', timestampField: 'timestamp' },
   sleep: { arrayPath: 'sleep_json.sessions', timestampField: 'endTime' },
   bloodOxygen: { arrayPath: 'blood_oxygen_json.samples', timestampField: 'timestamp' },
   bloodGlucose: { arrayPath: 'blood_glucose_json.samples', timestampField: 'timestamp' },
