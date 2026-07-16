@@ -48,10 +48,16 @@ export const createMetricRoutes = (metric: MetricName) => {
   routes.get('/:id', async (context) => {
     try {
       const user = await getAuthenticatedUser(context)
+      const requestedOwnerUserId = context.req.param('id')
+
       return context.json(
-        await metricService.getById(metric, user, context.req.param('id'), {
+        await metricService.list(metric, user, {
+          ownerUserId: requestedOwnerUserId ?? context.req.query('ownerUserId'),
           ownerEmail: context.req.query('ownerEmail'),
-          ownerUserId: context.req.query('ownerUserId'),
+          date: context.req.query('date'),
+          from: context.req.query('from'),
+          to: context.req.query('to'),
+          limit: context.req.query('limit'),
         }),
       )
     } catch (error) {
