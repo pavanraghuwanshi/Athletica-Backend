@@ -90,6 +90,13 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
   const ownerUserId = query.ownerUserId?.trim()
 
   if (ownerUserId) {
+    // The authenticated user's profile was already loaded while validating the
+    // bearer token. Avoid an identical second MongoDB lookup for the common
+    // "my own health data" request.
+    if (ownerUserId === viewer.id) {
+      return { id: viewer.id, name: viewer.name, email: viewer.email, picture: viewer.picture }
+    }
+
     const owner = await userStore.findById(ownerUserId)
 
     if (!owner) {
@@ -522,7 +529,14 @@ export const metricService = {
   list: async (
     metric: MetricName,
     viewer: AuthUserResponse,
-    query: { ownerEmail?: string; ownerUserId?: string; date?: string; from?: string; to?: string; limit?: string },
+    query: {
+      ownerEmail?: string
+      ownerUserId?: string
+      date?: string
+      from?: string
+      to?: string
+      limit?: string
+    },
   ) => {
     const date = parseDate(query.date, 'date')
     const from = parseDate(query.from, 'from')

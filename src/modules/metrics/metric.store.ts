@@ -96,10 +96,15 @@ export const metricStore = {
       }
     }
 
-    return MetricModel.find(query)
-      .sort({ timestamp: -1, recordId: -1 })
-      .limit(filter.limit)
-      .lean()
+    const result = MetricModel.find(query).limit(filter.limit)
+
+    // A date identifies one daily record for metrics such as blood oxygen.
+    // Sorting a large document is unnecessary work in this common request.
+    if (!filter.date) {
+      result.sort({ timestamp: -1, recordId: -1 })
+    }
+
+    return result.lean()
   },
 
   findByRecordId: async (ownerUserId: string, metric: MetricName, recordId: string) => {
