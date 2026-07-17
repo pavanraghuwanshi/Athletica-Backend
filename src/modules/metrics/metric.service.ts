@@ -196,6 +196,14 @@ const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timest
   sportsWorkout: { arrayPath: 'samples_json', timestampField: 'timestamp' },
 }
 
+const userListMetricNames = metricNames.filter((metric) => metric !== 'ecg') as Exclude<MetricName, 'ecg'>[]
+const userListNestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timestampField: string }>> = {
+  ...nestedMeasurements,
+  // A daily pedometer document contains every hour. The user list needs only
+  // its final hourly object, not the complete raw hourly_json array.
+  pedometer: { arrayPath: 'hourly_json', timestampField: 'timestamp' },
+}
+
 type MetricMergeConfig = {
   arrayKey: string
   containerKey?: string
@@ -589,20 +597,23 @@ export const metricService = {
     const uniqueOwnerUserIds = [...new Set(ownerUserIds)]
     const latestByOwner = new Map<
       string,
-      { latestRecords: Record<MetricName, MetricRecord | null>; lastSyncAt: string | null }
+      { latestRecords: Record<Exclude<MetricName, 'ecg'>, MetricRecord | null>; lastSyncAt: string | null }
     >(
       uniqueOwnerUserIds.map((ownerUserId) => [
         ownerUserId,
         {
-          latestRecords: Object.fromEntries(metricNames.map((metric) => [metric, null])) as Record<MetricName, MetricRecord | null>,
+          latestRecords: Object.fromEntries(userListMetricNames.map((metric) => [metric, null])) as Record<
+            Exclude<MetricName, 'ecg'>,
+            MetricRecord | null
+          >,
           lastSyncAt: null,
         },
       ]),
     )
 
     const metricEntries = await Promise.all(
-      metricNames.map(async (metric) => {
-        const nested = nestedMeasurements[metric]
+      userListMetricNames.map(async (metric) => {
+        const nested = userListNestedMeasurements[metric]
         const entries = await metricStore.findLatestForOwners({
           ownerUserIds: uniqueOwnerUserIds,
           metric,
