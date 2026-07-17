@@ -126,6 +126,20 @@ export const metricStore = {
     }).lean()
   },
 
+  deleteByRecordIds: async (ownerUserId: string, metric: MetricName, recordIds: string[]) => {
+    if (!recordIds.length) {
+      return 0
+    }
+
+    const MetricModel = await getMetricModel(metric)
+    const result = await MetricModel.deleteMany({
+      ownerUserId,
+      recordId: { $in: [...new Set(recordIds)] },
+    })
+
+    return result.deletedCount
+  },
+
   findLatestNested: async (filter: {
     ownerUserId: string
     metric: MetricName

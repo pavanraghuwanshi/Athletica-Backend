@@ -6,6 +6,9 @@ import { metricStore } from './metric.store'
 import { metricNames, metricTimestampFields, type MetricName, type MetricRecord } from './metric.types'
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
+// Wearable data is presented as an India-local calendar day. The incoming
+// epoch values stay UTC; only the database day key uses the IST day boundary.
+const indiaTimezoneOffsetMs = 5.5 * 60 * 60 * 1000
 
 type MetricDocumentLike = {
   timestamp?: number
@@ -38,12 +41,14 @@ const getTimestamp = (metric: MetricName, record: MetricRecord) => {
 }
 
 const getRecordDate = (record: MetricRecord, timestamp?: number) => {
-  if (typeof record.id === 'string' && datePattern.test(record.id)) {
-    return record.id
+  if (timestamp !== undefined) {
+    // Do not mutate the timestamp sent by the device. Shifting before taking
+    // the UTC date gives the yyyy-MM-dd key for Asia/Kolkata (UTC+05:30).
+    return new Date(timestamp + indiaTimezoneOffsetMs).toISOString().slice(0, 10)
   }
 
-  if (timestamp !== undefined) {
-    return new Date(timestamp).toISOString().slice(0, 10)
+  if (typeof record.id === 'string' && datePattern.test(record.id)) {
+    return record.id
   }
 
   throw new AuthError('Each record needs a documented timestamp/date field', 400)
@@ -522,6 +527,24 @@ export const metricService = {
     })
 
     await metricStore.upsertMany(storedRecords)
+
+    // Older versions used the client-provided date id as the daily record key.
+    // Once a re-sync stores that same day using its UTC timestamp's IST date,
+    // remove the legacy copy so it cannot appear under the wrong date filter.
+    if (metricMergeConfigs[metric]) {
+      const legacyRecordIds = [...new Set(
+        preparedRecords.flatMap((record) => {
+          const incomingId = record.data.id
+          return typeof incomingId === 'string' && datePattern.test(incomingId) && incomingId !== record.recordId
+            ? [incomingId]
+            : []
+        }),
+      )]
+
+      if (legacyRecordIds.length) {
+        await metricStore.deleteByRecordIds(user.id, metric, legacyRecordIds)
+      }
+    }
 
     return { metric, saved: records.length }
   },
