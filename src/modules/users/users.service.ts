@@ -2,6 +2,8 @@ import { AuthError } from '../auth/auth.service'
 import { userStore } from '../auth/auth.store'
 import type { AuthUserResponse, User } from '../auth/auth.types'
 import { accessService } from '../sharing/access.service'
+import { metricService } from '../metrics/metric.service'
+import { syncStore } from '../sync/sync.store'
 
 type VisibleUser = Pick<User, 'id' | 'name' | 'email' | 'picture' | 'role' | 'createdAt' | 'updatedAt'> & {
   accessType: 'self' | 'dataAdmin' | 'superAdmin'
@@ -39,9 +41,25 @@ export const usersService = {
     const total = users.length
     const totalPages = Math.max(1, Math.ceil(total / limit))
     const offset = (page - 1) * limit
+    const pageUsers = users.slice(offset, offset + limit)
+    const pageUserIds = pageUsers.map((user) => user.id)
+    const [latestByOwner, lastSyncedAtByOwner] = await Promise.all([
+      metricService.latestForOwners(pageUserIds),
+      syncStore.findLastSyncedAtByOwnerIds(pageUserIds),
+    ])
 
     return {
-      users: users.slice(offset, offset + limit),
+      users: pageUsers.map((user) => {
+        const latest = latestByOwner.get(user.id)
+
+        return {
+          ...user,
+          lastSyncAt: lastSyncedAtByOwner.has(user.id)
+            ? new Date(lastSyncedAtByOwner.get(user.id)!).toISOString()
+            : latest?.lastSyncAt ?? null,
+          latestRecords: latest?.latestRecords ?? null,
+        }
+      }),
       pagination: {
         page,
         limit,

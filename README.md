@@ -129,6 +129,7 @@ All paths use the `/api/users` base and require a bearer token.
   - Regular users see their own account.
   - `admin` users see their own account plus users who verified OTP access for them.
   - Each item includes `accessType`: `self`, `dataAdmin`, or `superAdmin`.
+  - Each item also includes `lastSyncAt` and `latestRecords`, containing the latest raw object for every health metric. Health score and status are not included in this list response.
   - `limit` defaults to `20` and has a maximum of `100`.
 - `GET /api/users/:id` - get one visible user by id.
 - `GET /api/users/:id/overview` - get the latest record from every health metric plus dashboard summary cards for one visible user. Pass `?date=yyyy-MM-dd` to limit every metric to its latest record on that day.

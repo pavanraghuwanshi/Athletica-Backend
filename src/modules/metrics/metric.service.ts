@@ -16,6 +16,13 @@ type MetricDocumentLike = {
   data: MetricRecord
 }
 
+type LatestMetricEntry = {
+  ownerUserId: string
+  timestamp?: number
+  updatedAt?: Date
+  data: MetricRecord
+}
+
 const parseDate = (value: string | undefined, field: string) => {
   if (value === undefined) {
     return undefined
@@ -576,6 +583,52 @@ export const metricService = {
     }
 
     return { metric, ownerUserId: owner.id, ownerEmail: owner.email, record: document.data }
+  },
+
+  latestForOwners: async (ownerUserIds: string[]) => {
+    const uniqueOwnerUserIds = [...new Set(ownerUserIds)]
+    const latestByOwner = new Map<
+      string,
+      { latestRecords: Record<MetricName, MetricRecord | null>; lastSyncAt: string | null }
+    >(
+      uniqueOwnerUserIds.map((ownerUserId) => [
+        ownerUserId,
+        {
+          latestRecords: Object.fromEntries(metricNames.map((metric) => [metric, null])) as Record<MetricName, MetricRecord | null>,
+          lastSyncAt: null,
+        },
+      ]),
+    )
+
+    const metricEntries = await Promise.all(
+      metricNames.map(async (metric) => {
+        const nested = nestedMeasurements[metric]
+        const entries = await metricStore.findLatestForOwners({
+          ownerUserIds: uniqueOwnerUserIds,
+          metric,
+          ...(nested ?? {}),
+        })
+
+        return [metric, entries] as const
+      }),
+    )
+
+    for (const [metric, entries] of metricEntries) {
+      for (const entry of entries as LatestMetricEntry[]) {
+        const owner = latestByOwner.get(entry.ownerUserId)
+
+        if (!owner) continue
+
+        owner.latestRecords[metric] = entry.data
+        const updatedAt = entry.updatedAt?.toISOString()
+
+        if (updatedAt && (!owner.lastSyncAt || updatedAt > owner.lastSyncAt)) {
+          owner.lastSyncAt = updatedAt
+        }
+      }
+    }
+
+    return latestByOwner
   },
 
   overview: async (viewer: AuthUserResponse, ownerUserId: string, dateInput?: string) => {

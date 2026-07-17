@@ -126,6 +126,70 @@ export const metricStore = {
     }).lean()
   },
 
+  findLatestForOwners: async (filter: {
+    ownerUserIds: string[]
+    metric: MetricName
+    arrayPath?: string
+    timestampField?: string
+  }) => {
+    if (!filter.ownerUserIds.length) {
+      return []
+    }
+
+    const MetricModel = await getMetricModel(filter.metric)
+    const ownerUserIds = [...new Set(filter.ownerUserIds)]
+
+    if (filter.arrayPath && filter.timestampField) {
+      const measurementPath = `data.${filter.arrayPath}`
+      const timestampPath = `${measurementPath}.${filter.timestampField}`
+
+      return MetricModel.aggregate<{
+        ownerUserId: string
+        timestamp?: number
+        data: MetricRecord
+        updatedAt?: Date
+      }>([
+        { $match: { ownerUserId: { $in: ownerUserIds }, [`${measurementPath}.0`]: { $exists: true } } },
+        { $sort: { ownerUserId: 1, timestamp: -1, recordId: -1 } },
+        {
+          $group: {
+            _id: '$ownerUserId',
+            data: { $first: '$data' },
+            updatedAt: { $first: '$updatedAt' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            ownerUserId: '$_id',
+            timestamp: { $arrayElemAt: [`$${timestampPath}`, -1] },
+            data: { $arrayElemAt: [`$${measurementPath}`, -1] },
+            updatedAt: 1,
+          },
+        },
+      ])
+    }
+
+    return MetricModel.aggregate<{
+      ownerUserId: string
+      timestamp?: number
+      data: MetricRecord
+      updatedAt?: Date
+    }>([
+      { $match: { ownerUserId: { $in: ownerUserIds } } },
+      { $sort: { ownerUserId: 1, timestamp: -1, recordId: -1 } },
+      {
+        $group: {
+          _id: '$ownerUserId',
+          timestamp: { $first: '$timestamp' },
+          data: { $first: '$data' },
+          updatedAt: { $first: '$updatedAt' },
+        },
+      },
+      { $project: { _id: 0, ownerUserId: '$_id', timestamp: 1, data: 1, updatedAt: 1 } },
+    ])
+  },
+
   deleteByRecordIds: async (ownerUserId: string, metric: MetricName, recordIds: string[]) => {
     if (!recordIds.length) {
       return 0

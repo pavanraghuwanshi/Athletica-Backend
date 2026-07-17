@@ -2,6 +2,7 @@ import type { AuthUserResponse } from '../auth/auth.types'
 import { AuthError } from '../auth/auth.service'
 import { metricService } from '../metrics/metric.service'
 import { metricNames, type MetricName } from '../metrics/metric.types'
+import { syncStore } from './sync.store'
 
 type SyncPayload = Partial<Record<MetricName, unknown>> & { syncedAt?: unknown }
 
@@ -38,9 +39,12 @@ export const syncService = {
     const results = await Promise.all(
       uploads.map(({ metric, records }) => metricService.save(metric, user, records)),
     )
+    const syncedAt = typeof payload.syncedAt === 'number' ? payload.syncedAt : Date.now()
+
+    await syncStore.saveLastSyncedAt(user.id, syncedAt)
 
     return {
-      syncedAt: typeof payload.syncedAt === 'number' ? payload.syncedAt : Date.now(),
+      syncedAt,
       totalSaved: results.reduce((total, result) => total + result.saved, 0),
       savedByMetric: Object.fromEntries(results.map((result) => [result.metric, result.saved])),
     }
