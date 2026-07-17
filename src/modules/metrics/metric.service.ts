@@ -118,22 +118,8 @@ const resolveOwner = async (viewer: AuthUserResponse, query: { ownerEmail?: stri
   }
 
   if (!normalizedOwnerEmail) {
-    if (viewer.role === 'admin') {
-      const activeOwnerIds = await accessService.listActiveOwnerIds(viewer.id)
-
-      if (activeOwnerIds.length === 1) {
-        const owner = await userStore.findById(activeOwnerIds[0])
-
-        if (owner) {
-          return { id: owner.id, name: owner.name, email: owner.email, picture: owner.picture }
-        }
-      }
-
-      if (activeOwnerIds.length > 1) {
-        throw new AuthError('ownerUserId or ownerEmail is required when multiple users are connected', 400)
-      }
-    }
-
+    // Every role, including admin, receives its own data unless another owner
+    // was explicitly selected with ownerUserId or ownerEmail.
     return { id: viewer.id, name: viewer.name, email: viewer.email, picture: viewer.picture }
   }
 
