@@ -4,6 +4,7 @@ import { accessController } from './access.controller'
 export const accessRoutes = new Hono()
 
 accessRoutes.post('/connect', accessController.connect)
+accessRoutes.post('/disconnect', accessController.disconnect)
 accessRoutes.post('/requests', accessController.create)
 accessRoutes.get('/requests/sent', accessController.sent)
 accessRoutes.get('/requests/received', accessController.received)

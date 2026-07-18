@@ -38,6 +38,16 @@ export const accessController = {
     }
   },
 
+  disconnect: async (context: Context) => {
+    try {
+      const admin = await getAuthenticatedUser(context)
+      const body = await getBody<{ ownerUserId?: string; ownerEmail?: string }>(context)
+      return context.json(await accessService.disconnect(admin, body))
+    } catch (error) {
+      return handleError(context, error)
+    }
+  },
+
   create: async (context: Context) => {
     try {
       const user = await getAuthenticatedUser(context)

@@ -630,6 +630,16 @@ All paths use the `/api/admin-access` base and require a bearer token.
 
   Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` before using this endpoint. The authenticated requester verifies the emailed OTP with `POST /api/admin-access/requests/:id/verify-otp`. Calling this endpoint again reuses the same pending request and sends a fresh OTP. Five OTP sends are allowed, followed by a 10-minute cooldown; sending is available again after the cooldown. An already-active connection returns success without sending another OTP.
 
+- `POST /api/admin-access/disconnect` - an authenticated data admin removes an active user connection. Send either the connected user's id or email; the user account and health data are not deleted.
+
+  ```json
+  { "ownerUserId": "user-id" }
+  ```
+
+  ```json
+  { "ownerEmail": "user@example.com" }
+  ```
+
 - `POST /api/admin-access/requests` - request access to another user's health data.
 
   ```json

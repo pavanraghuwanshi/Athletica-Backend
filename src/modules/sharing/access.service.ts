@@ -167,6 +167,43 @@ export const accessService = {
     return sendConnectionOtp(request, requester, owner.email, true)
   },
 
+  disconnect: async (
+    admin: AuthUserResponse,
+    target: { ownerUserId?: string; ownerEmail?: string },
+  ) => {
+    if (admin.role !== 'admin') {
+      throw new AuthError('Only a data admin can disconnect a user', 403)
+    }
+
+    const ownerUserId = target.ownerUserId?.trim()
+    const ownerEmail = normalizeEmail(target.ownerEmail)
+
+    if (!ownerUserId && !ownerEmail) {
+      throw new AuthError('ownerUserId or ownerEmail is required', 400)
+    }
+
+    const owner = ownerUserId
+      ? await userStore.findById(ownerUserId)
+      : await userStore.findByEmail(ownerEmail)
+
+    if (!owner) {
+      throw new AuthError('Connected user not found', 404)
+    }
+
+    const request = await accessStore.findOpen(admin.id, owner.id)
+
+    if (!request || request.status !== 'active') {
+      throw new AuthError('You do not have active access for this user', 404)
+    }
+
+    const revoked = await accessStore.setStatus(request.id, 'revoked')
+
+    return {
+      message: 'User disconnected successfully',
+      request: await toResponse(revoked!),
+    }
+  },
+
   requestAccess: async (requester: AuthUserResponse, ownerEmailInput?: string) => {
     const ownerEmail = normalizeEmail(ownerEmailInput)
 
