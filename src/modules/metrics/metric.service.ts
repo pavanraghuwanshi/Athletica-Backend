@@ -11,6 +11,7 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/
 const indiaTimezoneOffsetMs = 5.5 * 60 * 60 * 1000
 
 type MetricDocumentLike = {
+  date?: string
   timestamp?: number
   updatedAt?: Date | string
   data: MetricRecord
@@ -233,6 +234,25 @@ const getUpdatedAt = (document?: MetricDocumentLike) => {
   return undefined
 }
 
+// Sleep records are keyed to the wearable's overnight date, which is often
+// many hours before the data was uploaded. Use MongoDB's update timestamp when
+// showing when this daily sleep record was last synced.
+const getSyncedAt = (document?: MetricDocumentLike) => {
+  if (!document) {
+    return undefined
+  }
+
+  if (document.updatedAt instanceof Date) {
+    return document.updatedAt.toISOString()
+  }
+
+  if (typeof document.updatedAt === 'string') {
+    return document.updatedAt
+  }
+
+  return getUpdatedAt(document)
+}
+
 const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timestampField: string }>> = {
   sleep: { arrayPath: 'sleep_json.sessions', timestampField: 'endTime' },
   bloodOxygen: { arrayPath: 'blood_oxygen_json.samples', timestampField: 'timestamp' },
@@ -407,7 +427,8 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
   const met = documents.met?.data
   const bloodComponents = documents.bloodComponents?.data
   const pedometer = documents.pedometer?.data
-  const sleepMinutes = asNumber(sleep?.totalMinutes)
+  const sleepSummary = sleep ? summarizeSleepRecord(documents.sleep?.date ?? '', sleep) : undefined
+  const sleepMinutes = sleepSummary?.totalMinutes
   const cards = [
     {
       key: 'heartRate',
@@ -450,8 +471,14 @@ const buildOverview = (documents: Partial<Record<MetricName, MetricDocumentLike>
       key: 'sleep',
       title: 'Sleep',
       value: formatMinutes(sleepMinutes),
-      meta: { totalMinutes: sleepMinutes },
-      updatedAt: getUpdatedAt(documents.sleep),
+      meta: {
+        totalMinutes: sleepMinutes,
+        awakeMinutes: sleepSummary?.awakeMinutes,
+        deepMinutes: sleepSummary?.deepMinutes,
+        lightMinutes: sleepSummary?.lightMinutes,
+        remMinutes: sleepSummary?.remMinutes,
+      },
+      updatedAt: getSyncedAt(documents.sleep),
     },
     {
       key: 'hrv',
@@ -725,7 +752,10 @@ export const metricService = {
     const owner = await resolveOwner(viewer, { ownerUserId })
     const entries = await Promise.all(
       metricNames.map(async (metric) => {
-        const nested = nestedMeasurements[metric]
+        // Sleep sessions are nested inside a single daily record. Selecting
+        // the latest nested session can select a short nap and hide the main
+        // night's sleep, so overview uses the complete daily record instead.
+        const nested = metric === 'sleep' ? undefined : nestedMeasurements[metric]
         let document: MetricDocumentLike | undefined = nested
           ? await metricStore.findLatestNested({
               ownerUserId: owner.id,
@@ -750,7 +780,12 @@ export const metricService = {
     )
     const documents = Object.fromEntries(entries) as Partial<Record<MetricName, MetricDocumentLike>>
     const latestRecords = Object.fromEntries(
-      metricNames.map((metric) => [metric, documents[metric]?.data ?? null]),
+      metricNames.map((metric) => [
+        metric,
+        metric === 'sleep' && documents.sleep
+          ? summarizeSleepRecord(documents.sleep.date ?? '', documents.sleep.data)
+          : documents[metric]?.data ?? null,
+      ]),
     ) as Record<MetricName, MetricRecord | null>
     const overview = buildOverview(documents)
 
