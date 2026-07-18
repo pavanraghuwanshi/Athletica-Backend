@@ -146,6 +146,7 @@ export const metricStore = {
       return MetricModel.aggregate<{
         ownerUserId: string
         timestamp?: number
+        date?: string
         data: MetricRecord
         updatedAt?: Date
       }>([
@@ -154,6 +155,7 @@ export const metricStore = {
         {
           $group: {
             _id: '$ownerUserId',
+            date: { $first: '$date' },
             data: { $first: '$data' },
             updatedAt: { $first: '$updatedAt' },
           },
@@ -163,6 +165,7 @@ export const metricStore = {
             _id: 0,
             ownerUserId: '$_id',
             timestamp: { $arrayElemAt: [`$${timestampPath}`, -1] },
+            date: 1,
             data: { $arrayElemAt: [`$${measurementPath}`, -1] },
             updatedAt: 1,
           },
@@ -173,6 +176,7 @@ export const metricStore = {
     return MetricModel.aggregate<{
       ownerUserId: string
       timestamp?: number
+      date?: string
       data: MetricRecord
       updatedAt?: Date
     }>([
@@ -182,11 +186,12 @@ export const metricStore = {
         $group: {
           _id: '$ownerUserId',
           timestamp: { $first: '$timestamp' },
+          date: { $first: '$date' },
           data: { $first: '$data' },
           updatedAt: { $first: '$updatedAt' },
         },
       },
-      { $project: { _id: 0, ownerUserId: '$_id', timestamp: 1, data: 1, updatedAt: 1 } },
+      { $project: { _id: 0, ownerUserId: '$_id', timestamp: 1, date: 1, data: 1, updatedAt: 1 } },
     ])
   },
 

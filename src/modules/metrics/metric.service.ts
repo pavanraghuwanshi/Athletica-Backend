@@ -20,6 +20,7 @@ type MetricDocumentLike = {
 type LatestMetricEntry = {
   ownerUserId: string
   timestamp?: number
+  date?: string
   updatedAt?: Date
   data: MetricRecord
 }
@@ -266,8 +267,9 @@ const nestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timest
 }
 
 const userListMetricNames = metricNames.filter((metric) => metric !== 'ecg') as Exclude<MetricName, 'ecg'>[]
+const { sleep: _, ...otherNestedMeasurements } = nestedMeasurements
 const userListNestedMeasurements: Partial<Record<MetricName, { arrayPath: string; timestampField: string }>> = {
-  ...nestedMeasurements,
+  ...otherNestedMeasurements,
   // A daily pedometer document contains every hour. The user list needs only
   // its final hourly object, not the complete raw hourly_json array.
   pedometer: { arrayPath: 'hourly_json', timestampField: 'timestamp' },
@@ -735,7 +737,10 @@ export const metricService = {
 
         if (!owner) continue
 
-        owner.latestRecords[metric] = entry.data
+        owner.latestRecords[metric] =
+          metric === 'sleep'
+            ? summarizeSleepRecord(entry.date ?? '', entry.data)
+            : entry.data
         const updatedAt = entry.updatedAt?.toISOString()
 
         if (updatedAt && (!owner.lastSyncAt || updatedAt > owner.lastSyncAt)) {
