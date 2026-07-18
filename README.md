@@ -360,6 +360,45 @@ Send the shown record to its function-wise POST endpoint. Every endpoint also ac
 }
 ```
 
+##### Sleep summary (no raw stage data)
+
+`GET /api/bandpro/sleep/summary?from=2026-07-01&to=2026-07-10`
+
+Returns only the sleep totals and session times for each day. It does not return
+the raw `sleep_json` or `stageSegments`. `date=yyyy-MM-dd` can be used instead
+of `from`/`to`; owner access parameters and `limit` work the same as other metric GET endpoints.
+
+```json
+{
+  "ownerUserId": "user-id",
+  "ownerEmail": "user@example.com",
+  "count": 1,
+  "records": [
+    {
+      "date": "2026-07-10",
+      "totalMinutes": 480,
+      "deepMinutes": 120,
+      "lightMinutes": 300,
+      "remMinutes": 60,
+      "awakeMinutes": 0,
+      "sleepTime": "8h 0m",
+      "awakeTime": "0h 0m",
+      "sessions": [
+        {
+          "startTime": 1786524300000,
+          "endTime": 1786553100000,
+          "totalMinutes": 480,
+          "deepMinutes": 120,
+          "lightMinutes": 300,
+          "remMinutes": 60,
+          "awakeMinutes": 0
+        }
+      ]
+    }
+  ]
+}
+```
+
 #### Blood oxygen
 
 `POST /api/bandpro/blood-oxygen`

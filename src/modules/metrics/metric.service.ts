@@ -164,6 +164,55 @@ const formatMinutes = (minutes?: number) => {
   return `${hours}h ${remainingMinutes}m`
 }
 
+const sleepSummaryFields = [
+  'startTime',
+  'endTime',
+  'totalMinutes',
+  'deepMinutes',
+  'lightMinutes',
+  'remMinutes',
+  'awakeMinutes',
+] as const
+
+type SleepSessionSummary = Record<(typeof sleepSummaryFields)[number], number | null>
+
+const getSleepSessions = (record: MetricRecord) => {
+  const sleepJson = asRecord(record.sleep_json)
+  return asArray(sleepJson?.sessions)
+    .map(asRecord)
+    .filter((session): session is MetricRecord => session !== undefined)
+}
+
+const summarizeSleepRecord = (date: string, record: MetricRecord) => {
+  const sessions: SleepSessionSummary[] = getSleepSessions(record).map((session) => ({
+    startTime: asNumber(session.startTime) ?? null,
+    endTime: asNumber(session.endTime) ?? null,
+    totalMinutes: asNumber(session.totalMinutes) ?? null,
+    deepMinutes: asNumber(session.deepMinutes) ?? null,
+    lightMinutes: asNumber(session.lightMinutes) ?? null,
+    remMinutes: asNumber(session.remMinutes) ?? null,
+    awakeMinutes: asNumber(session.awakeMinutes) ?? null,
+  }))
+
+  const totals = sessions.reduce(
+    (summary, session) => {
+      for (const field of ['totalMinutes', 'deepMinutes', 'lightMinutes', 'remMinutes', 'awakeMinutes'] as const) {
+        summary[field] = summary[field] + (session[field] ?? 0)
+      }
+      return summary
+    },
+    { totalMinutes: 0, deepMinutes: 0, lightMinutes: 0, remMinutes: 0, awakeMinutes: 0 },
+  )
+
+  return {
+    date,
+    ...totals,
+    sleepTime: formatMinutes(totals.totalMinutes),
+    awakeTime: formatMinutes(totals.awakeMinutes),
+    sessions,
+  }
+}
+
 const getUpdatedAt = (document?: MetricDocumentLike) => {
   if (!document) {
     return undefined
@@ -580,6 +629,35 @@ export const metricService = {
     const documents = await metricStore.find({ ownerUserId: owner.id, metric, date, from, to, limit })
 
     return { metric, ownerUserId: owner.id, ownerEmail: owner.email, count: documents.length, records: documents.map((item) => item.data) }
+  },
+
+  sleepSummary: async (
+    viewer: AuthUserResponse,
+    query: { ownerEmail?: string; ownerUserId?: string; date?: string; from?: string; to?: string; limit?: string },
+  ) => {
+    const date = parseDate(query.date, 'date')
+    const from = parseDate(query.from, 'from')
+    const to = parseDate(query.to, 'to')
+
+    if (date && (from || to)) {
+      throw new AuthError('Use either date or from/to filters, not both', 400)
+    }
+
+    if (from && to && from > to) {
+      throw new AuthError('from must be earlier than or equal to to', 400)
+    }
+
+    const owner = await resolveOwner(viewer, query)
+    const requestedLimit = Number(query.limit ?? 500)
+    const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 5000) : 500
+    const documents = await metricStore.find({ ownerUserId: owner.id, metric: 'sleep', date, from, to, limit })
+
+    return {
+      ownerUserId: owner.id,
+      ownerEmail: owner.email,
+      count: documents.length,
+      records: documents.map((document) => summarizeSleepRecord(document.date, document.data)),
+    }
   },
 
   getById: async (metric: MetricName, viewer: AuthUserResponse, recordId: string, query: { ownerEmail?: string; ownerUserId?: string }) => {
