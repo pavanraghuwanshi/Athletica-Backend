@@ -149,7 +149,7 @@ All paths use the `/api/admin-groups` base and require a bearer token. Groups ar
   ```json
   { "name": "Hockey Team", "sport": "hockey", "memberUserIds": ["user-id-1", "user-id-2"] }
   ```
-- `GET /api/admin-groups` - list groups owned by the authenticated admin.
+- `GET /api/admin-groups?page=1&limit=20&search=hockey` - list the authenticated admin's groups with pagination. `search` matches group name or sport (case-insensitive); `limit` is capped at 100. The response includes `groups` and `pagination` (`page`, `limit`, `total`, `totalPages`, `hasNextPage`, `hasPreviousPage`).
 - `GET /api/admin-groups/:id` - get one owned group.
 - `PATCH /api/admin-groups/:id` - update `name`, `sport`, or `memberUserIds`.
 - `DELETE /api/admin-groups/:id` - delete one owned group.

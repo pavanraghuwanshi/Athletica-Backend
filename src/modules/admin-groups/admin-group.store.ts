@@ -36,10 +36,29 @@ export const adminGroupStore = {
     return AdminGroupModel.create({ id: crypto.randomUUID(), ...input })
   },
 
-  listByAdmin: async (adminUserId: string) => {
+  listByAdmin: async (
+    adminUserId: string,
+    options: { page: number; limit: number; search?: string },
+  ) => {
     const AdminGroupModel = await getAdminGroupModel()
+    const filter: mongoose.FilterQuery<AdminGroupDocument> = { adminUserId }
 
-    return AdminGroupModel.find({ adminUserId }).sort({ createdAt: -1 }).lean()
+    if (options.search) {
+      const escapedSearch = options.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const searchExpression = new RegExp(escapedSearch, 'i')
+      filter.$or = [{ name: searchExpression }, { sport: searchExpression }]
+    }
+
+    const [groups, total] = await Promise.all([
+      AdminGroupModel.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((options.page - 1) * options.limit)
+        .limit(options.limit)
+        .lean(),
+      AdminGroupModel.countDocuments(filter),
+    ])
+
+    return { groups, total }
   },
 
   findById: async (id: string) => {

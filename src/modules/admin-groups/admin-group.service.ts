@@ -76,10 +76,28 @@ export const adminGroupService = {
     return toResponse(group)
   },
 
-  list: async (admin: AuthUserResponse) => {
+  list: async (admin: AuthUserResponse, query: { page?: string; limit?: string; search?: string }) => {
     ensureAdminRole(admin)
 
-    return Promise.all((await adminGroupStore.listByAdmin(admin.id)).map(toResponse))
+    const requestedPage = Number(query.page ?? 1)
+    const requestedLimit = Number(query.limit ?? 20)
+    const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1
+    const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20
+    const search = normalizeText(query.search)
+    const { groups, total } = await adminGroupStore.listByAdmin(admin.id, { page, limit, search })
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+
+    return {
+      groups: await Promise.all(groups.map(toResponse)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    }
   },
 
   get: async (admin: AuthUserResponse, groupId: string) => {

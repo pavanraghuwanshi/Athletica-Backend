@@ -31,7 +31,13 @@ export const adminGroupController = {
 
   list: async (context: Context) => {
     try {
-      return context.json({ groups: await adminGroupService.list(await getAuthenticatedUser(context)) })
+      return context.json(
+        await adminGroupService.list(await getAuthenticatedUser(context), {
+          page: context.req.query('page'),
+          limit: context.req.query('limit'),
+          search: context.req.query('search'),
+        }),
+      )
     } catch (error) {
       return handleError(context, error)
     }
