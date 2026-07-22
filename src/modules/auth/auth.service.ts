@@ -567,9 +567,7 @@ export const authService = {
       throw new AuthError('User not found', 404)
     }
 
-    const personInfo = await personInfoStore.getByUserId(user.id)
-
-    return { user: toUserResponse(user), personInfo }
+    return toUserResponse(user)
   },
 
   logout: async (token: string) => {
@@ -584,7 +582,7 @@ export const authService = {
       throw new AuthError('Send confirmation as DELETE to permanently delete the account', 400)
     }
 
-    const { user } = await authService.getUserFromToken(token)
+    const user = await authService.getUserFromToken(token)
     const [healthRecordsDeleted] = await Promise.all([
       metricStore.deleteAllByOwner(user.id),
       accessStore.deleteByUserId(user.id),

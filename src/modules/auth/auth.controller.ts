@@ -4,6 +4,7 @@ import { httpStatus } from '../../shared/http/status-codes'
 import { AuthError, authService } from './auth.service'
 import type { AppleAuthInput, GoogleAuthInput, LoginInput, RegisterInput } from './auth.types'
 import { getBearerToken } from './auth.guard'
+import { personInfoStore } from '../person-info/person-info.store'
 
 const getJsonBody = async <T>(context: Context) => {
   try {
@@ -102,9 +103,10 @@ export const authController = {
 
   me: async (context: Context) => {
     try {
-      const result = await authService.getUserFromToken(getBearerToken(context))
+      const user = await authService.getUserFromToken(getBearerToken(context))
+      const personInfo = await personInfoStore.getByUserId(user.id)
 
-      return context.json(result, httpStatus.ok)
+      return context.json({ user, personInfo }, httpStatus.ok)
     } catch (error) {
       return handleAuthError(context, error)
     }
