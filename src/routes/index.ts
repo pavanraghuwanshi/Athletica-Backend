@@ -19,11 +19,13 @@ import { sportsWorkoutRoutes } from '../modules/sports-workout/sports-workout.ro
 import { accessRoutes } from '../modules/sharing/access.routes'
 import { adminGroupRoutes } from '../modules/admin-groups/admin-group.routes'
 import { syncRoutes } from '../modules/sync/sync.routes'
+import { personInfoRoutes } from '../modules/person-info/person-info.routes'
 
 export const registerRoutes = (app: Hono) => {
   app.route('/api/', healthRoutes)
   app.route('/api/auth', authRoutes)
   app.route('/api/users', usersRoutes)
+  app.route('/api/person-info', personInfoRoutes)
   app.route('/api/bandpro/heart-rate', heartRateRoutes)
   app.route('/api/bandpro/pedometer', pedometerRoutes)
   app.route('/api/bandpro/sleep', sleepRoutes)

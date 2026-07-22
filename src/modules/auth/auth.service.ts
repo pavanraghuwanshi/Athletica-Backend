@@ -15,6 +15,7 @@ import { tokenRevocationStore } from './token-revocation.store'
 import { metricStore } from '../metrics/metric.store'
 import { accessStore } from '../sharing/access.store'
 import { adminGroupStore } from '../admin-groups/admin-group.store'
+import { personInfoStore } from '../person-info/person-info.store'
 
 type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 502
 
@@ -106,9 +107,11 @@ const addProvider = (providers: AuthProvider[], provider: AuthProvider) => {
 }
 
 const createAuthResponse = async (user: User) => {
+  const personInfo = await personInfoStore.getByUserId(user.id)
   return {
     user: toUserResponse(user),
     token: await createToken(user),
+    personInfo,
   }
 }
 
@@ -564,7 +567,9 @@ export const authService = {
       throw new AuthError('User not found', 404)
     }
 
-    return toUserResponse(user)
+    const personInfo = await personInfoStore.getByUserId(user.id)
+
+    return { user: toUserResponse(user), personInfo }
   },
 
   logout: async (token: string) => {
@@ -579,11 +584,12 @@ export const authService = {
       throw new AuthError('Send confirmation as DELETE to permanently delete the account', 400)
     }
 
-    const user = await authService.getUserFromToken(token)
+    const { user } = await authService.getUserFromToken(token)
     const [healthRecordsDeleted] = await Promise.all([
       metricStore.deleteAllByOwner(user.id),
       accessStore.deleteByUserId(user.id),
       adminGroupStore.deleteByUserId(user.id),
+      personInfoStore.deleteByUserId(user.id),
     ])
 
     await userStore.deleteById(user.id)

@@ -102,9 +102,9 @@ export const authController = {
 
   me: async (context: Context) => {
     try {
-      const user = await authService.getUserFromToken(getBearerToken(context))
+      const result = await authService.getUserFromToken(getBearerToken(context))
 
-      return context.json({ user }, httpStatus.ok)
+      return context.json(result, httpStatus.ok)
     } catch (error) {
       return handleAuthError(context, error)
     }

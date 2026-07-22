@@ -105,6 +105,23 @@ Base path: `/api/auth`
   ```
   This permanently deletes the user, all records from their 14 health collections, every sent/received data-admin request or grant, and owned admin groups. The deleted user is also removed from other admin groups. The deleted user's JWTs stop working because the user no longer exists.
 
+**Response format for login/register/me:**
+All endpoints that return the authenticated user (`register`, `login`, `google`, `apple`, `me`) return the user's base information and their `personInfo`:
+```json
+{
+  "user": { "id": "...", "name": "...", "email": "..." },
+  "token": "ey...",
+  "personInfo": {
+    "gender": "Male",
+    "name": "Pavan",
+    "height": 175,
+    "weight": 70,
+    "age": 25
+  }
+}
+```
+*(Note: `token` is not returned in the `me` endpoint, and `personInfo` will be `null` if not set yet).*
+
 Set these environment variables:
 
 ```txt
@@ -140,6 +157,23 @@ All paths use the `/api/users` base and require a bearer token.
   The response includes the user's `name` and `picture`. Without `date`, each item in `latestRecords` is the user's newest measurement for that metric across all dates. For daily payloads, the API selects the nested sample/session/hour with the greatest measurement timestamp instead of using the database update time or returning the full daily wrapper. Missing metric and summary values are returned as `null`; fixed response keys are never omitted. The response also includes `healthScore`, normalized `cards`, and `activity`, calculated from those latest measurements.
 
 Regular data-admin users can read connected users' health data through existing Band Pro GET APIs by passing `ownerUserId` or `ownerEmail`. `superAdmin` can read any user's health data with `ownerUserId` or `ownerEmail`.
+
+## Person info API
+
+All paths use the `/api/person-info` base and require a bearer token.
+
+- `GET /api/person-info` - get the authenticated user's person info.
+- `POST /api/person-info` or `PUT /api/person-info` - create or update the authenticated user's person info.
+  ```json
+  {
+    "gender": "Male",
+    "name": "Pavan",
+    "height": 175,
+    "weight": 70,
+    "age": 25
+  }
+  ```
+- `DELETE /api/person-info` - delete the authenticated user's person info.
 
 ## Admin groups API
 
