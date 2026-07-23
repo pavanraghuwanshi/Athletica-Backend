@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose'
 import { connectDatabase } from '../../config/db'
-import type { AdvertisementBanner, CreateAdvertisementBannerInput, UpdateAdvertisementBannerInput } from './advertisement-banner.types'
+import type { AdvertisementBanner } from './advertisement-banner.types'
 
 type AdvertisementBannerDocument = AdvertisementBanner & mongoose.Document
 
@@ -13,7 +13,8 @@ const getAdvertisementBannerModel = async () => {
     const advertisementBannerSchema = new Schema<AdvertisementBannerDocument>(
       {
         id: { type: String, required: true, unique: true },
-        imageUrl: { type: String, required: true },
+        fileUrl: { type: String, required: true },
+        contentType: { type: String, enum: ['image', 'video'], required: true },
         sequence: { type: Number, required: true },
         redirectUrl: { type: String },
         createdAt: { type: String, required: true },
@@ -55,23 +56,23 @@ export const advertisementBannerStore = {
     return toAdvertisementBanner(await Model.findOne({ id }))
   },
 
-  create: async (id: string, input: CreateAdvertisementBannerInput) => {
+  create: async (id: string, payload: Omit<AdvertisementBanner, 'id' | 'createdAt' | 'updatedAt'>) => {
     const Model = await getAdvertisementBannerModel()
     const now = new Date().toISOString()
     const document = await Model.create({
       id,
-      ...input,
+      ...payload,
       createdAt: now,
       updatedAt: now,
     })
     return toAdvertisementBanner(document) as AdvertisementBanner
   },
 
-  update: async (id: string, input: UpdateAdvertisementBannerInput) => {
+  update: async (id: string, payload: Partial<Omit<AdvertisementBanner, 'id' | 'createdAt' | 'updatedAt'>>) => {
     const Model = await getAdvertisementBannerModel()
     const document = await Model.findOneAndUpdate(
       { id },
-      { ...input, updatedAt: new Date().toISOString() },
+      { ...payload, updatedAt: new Date().toISOString() },
       { new: true, runValidators: true }
     )
     return toAdvertisementBanner(document)

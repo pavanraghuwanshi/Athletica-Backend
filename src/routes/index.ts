@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import { videoController } from '../modules/advertisement-banner/video.controller'
 import { authRoutes } from '../modules/auth/auth.routes'
 import { usersRoutes } from '../modules/users/users.routes'
 import { healthRoutes } from '../modules/health/health.routes'
@@ -45,4 +46,6 @@ export const registerRoutes = (app: Hono) => {
   app.route('/api/admin-access', accessRoutes)
   app.route('/api/admin-groups', adminGroupRoutes)
   app.route('/api/advertisement-banner', advertisementBannerRoutes)
+  
+  app.get('/api/videos/banners/:filename', videoController.streamVideo)
 }

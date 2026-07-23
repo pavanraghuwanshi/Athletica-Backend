@@ -191,33 +191,42 @@ All paths use the `/api/advertisement-banner` base.
 - `GET /api/advertisement-banner` - List all banners sorted by sequence (Public, no token required).
 - `GET /api/advertisement-banner/:id` - Get a specific banner by ID (Public, no token required).
 - `POST /api/advertisement-banner` - Create a new banner (`superAdmin` only).
-  ```json
-  {
-    "imageUrl": "https://example.com/banner.png",
-    "sequence": 1,
-    "redirectUrl": "https://example.com/promo"
-  }
+  ```http
+  POST /api/advertisement-banner
+  Content-Type: multipart/form-data
   ```
+  **Form Fields:**
+  - `file`: (File) The image or video file.
+  - `contentType`: (String) Either `"image"` or `"video"`.
+  - `sequence`: (Number) The display order.
+  - `redirectUrl`: (String, Optional) URL to redirect to on click.
+
 - `PUT /api/advertisement-banner/:id` - Update an existing banner (`superAdmin` only).
-  ```json
-  {
-    "imageUrl": "https://example.com/banner-updated.png",
-    "sequence": 2
-  }
+  ```http
+  PUT /api/advertisement-banner/:id
+  Content-Type: multipart/form-data
   ```
+  **Form Fields (All Optional):**
+  - `file`: (File) The new image or video file.
+  - `contentType`: (String) `"image"` or `"video"`.
+  - `sequence`: (Number) New display order.
+  - `redirectUrl`: (String) New redirect URL.
+
 - `DELETE /api/advertisement-banner/:id` - Delete a banner (`superAdmin` only).
 
 **Response format for banners:**
 ```json
 {
   "id": "uuid",
-  "imageUrl": "https://example.com/banner.png",
+  "fileUrl": "/images/banners/random-uuid.png",
+  "contentType": "image",
   "sequence": 1,
   "redirectUrl": "https://example.com/promo",
   "createdAt": "2026-07-23T12:00:00.000Z",
   "updatedAt": "2026-07-23T12:00:00.000Z"
 }
 ```
+*(Note: For videos, the `fileUrl` will look like `/api/videos/banners/random-uuid.mp4` to support chunked streaming)*
 
 ## Admin groups API
 

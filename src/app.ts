@@ -5,12 +5,16 @@ import { errorMiddleware } from './middlewares/error.middleware'
 import { notFoundMiddleware } from './middlewares/not-found.middleware'
 import { registerRoutes } from './routes'
 
+import { serveStatic } from 'hono/bun'
+
 const app = new Hono()
 
 app.use('*', cors({ origin: '*' }))
 // Large wearable-data payloads are highly repetitive JSON. Compress them when
 // the client advertises support (gzip, Brotli, or zstd) to reduce transfer time.
 app.use('*', compress())
+
+app.use('/images/*', serveStatic({ root: './public' }))
 
 registerRoutes(app)
 

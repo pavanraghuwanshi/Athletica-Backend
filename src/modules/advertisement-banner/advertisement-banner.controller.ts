@@ -13,6 +13,14 @@ const getJsonBody = async <T>(context: Context) => {
   }
 }
 
+const getFormData = async (context: Context) => {
+  try {
+    return await context.req.parseBody()
+  } catch {
+    throw new AuthError('Valid multipart/form-data body is required', httpStatus.badRequest)
+  }
+}
+
 const handleError = (context: Context, error: unknown) => {
   if (error instanceof AuthError) {
     return context.json({ message: error.message }, error.statusCode)
@@ -45,13 +53,26 @@ export const advertisementBannerController = {
   create: async (context: Context) => {
     try {
       const viewer = await getAuthenticatedUser(context)
-      const body = await getJsonBody<CreateAdvertisementBannerInput>(context)
+      const body = await getFormData(context)
       
-      if (!body.imageUrl || typeof body.sequence !== 'number') {
-        throw new AuthError('imageUrl and sequence are required', httpStatus.badRequest)
+      const file = body['file']
+      const contentType = body['contentType'] as 'image' | 'video' | undefined
+      const sequenceStr = body['sequence']
+      const sequence = typeof sequenceStr === 'string' ? parseInt(sequenceStr, 10) : undefined
+      const redirectUrl = typeof body['redirectUrl'] === 'string' ? body['redirectUrl'] : undefined
+      
+      if (!file || typeof sequence !== 'number' || isNaN(sequence) || !contentType) {
+        throw new AuthError('file, contentType, and sequence are required', httpStatus.badRequest)
       }
 
-      const banner = await advertisementBannerService.create(viewer, body)
+      const input: CreateAdvertisementBannerInput = {
+        file: file as File,
+        contentType,
+        sequence,
+        redirectUrl
+      }
+
+      const banner = await advertisementBannerService.create(viewer, input)
       return context.json(banner, httpStatus.created)
     } catch (error) {
       return handleError(context, error)
@@ -63,9 +84,21 @@ export const advertisementBannerController = {
       const viewer = await getAuthenticatedUser(context)
       const id = context.req.param('id')
       if (!id) throw new AuthError('ID is required', httpStatus.badRequest)
-      const body = await getJsonBody<UpdateAdvertisementBannerInput>(context)
+      const body = await getFormData(context)
       
-      const banner = await advertisementBannerService.update(viewer, id, body)
+      const file = body['file']
+      const contentType = body['contentType'] as 'image' | 'video' | undefined
+      const sequenceStr = body['sequence']
+      const sequence = typeof sequenceStr === 'string' ? parseInt(sequenceStr, 10) : undefined
+      const redirectUrl = typeof body['redirectUrl'] === 'string' ? body['redirectUrl'] : undefined
+
+      const input: UpdateAdvertisementBannerInput = {}
+      if (file) input.file = file as File
+      if (contentType) input.contentType = contentType
+      if (sequence !== undefined && !isNaN(sequence)) input.sequence = sequence
+      if (redirectUrl !== undefined) input.redirectUrl = redirectUrl
+      
+      const banner = await advertisementBannerService.update(viewer, id, input)
       return context.json(banner, httpStatus.ok)
     } catch (error) {
       return handleError(context, error)
