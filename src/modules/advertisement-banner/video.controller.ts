@@ -72,3 +72,38 @@ export const videoController = {
     }
   }
 }
+
+export const imageController = {
+  getImage: async (context: Context) => {
+    try {
+      const filename = context.req.param('filename')
+      if (!filename) {
+        return context.json({ message: 'Filename is required' }, httpStatus.badRequest)
+      }
+
+      const imagePath = path.join(process.cwd(), 'public', 'images', 'banners', filename)
+      
+      if (!imagePath.startsWith(path.join(process.cwd(), 'public', 'images', 'banners'))) {
+        return context.json({ message: 'Forbidden' }, httpStatus.forbidden)
+      }
+
+      if (!fs.existsSync(imagePath)) {
+        return context.json({ message: 'Image not found' }, httpStatus.notFound)
+      }
+
+      const ext = path.extname(filename).toLowerCase()
+      const mimeType = ext === '.png' ? 'image/png' 
+                     : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
+                     : ext === '.webp' ? 'image/webp'
+                     : ext === '.gif' ? 'image/gif'
+                     : 'image/jpeg'
+
+      context.res.headers.set('Content-Type', mimeType)
+      
+      return context.body(Bun.file(imagePath).stream(), 200)
+    } catch (error) {
+      console.error('Error serving image:', error)
+      return context.json({ message: 'Internal server error' }, httpStatus.internalServerError)
+    }
+  }
+}

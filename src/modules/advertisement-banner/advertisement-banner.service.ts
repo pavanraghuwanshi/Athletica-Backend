@@ -23,7 +23,7 @@ const saveFile = async (file: File, contentType: 'image' | 'video'): Promise<str
   if (contentType === 'image') {
     const filePath = path.join(IMAGES_DIR, filename)
     await Bun.write(filePath, file)
-    return `/images/banners/${filename}`
+    return `/api/images/banners/${filename}`
   } else {
     const filePath = path.join(VIDEOS_DIR, filename)
     await Bun.write(filePath, file)
