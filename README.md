@@ -175,6 +175,41 @@ All paths use the `/api/person-info` base and require a bearer token.
   ```
 - `DELETE /api/person-info` - delete the authenticated user's person info.
 
+## Advertisement Banner API
+
+All paths use the `/api/advertisement-banner` base.
+
+- `GET /api/advertisement-banner` - List all banners sorted by sequence (Public, no token required).
+- `GET /api/advertisement-banner/:id` - Get a specific banner by ID (Public, no token required).
+- `POST /api/advertisement-banner` - Create a new banner (`superAdmin` only).
+  ```json
+  {
+    "imageUrl": "https://example.com/banner.png",
+    "sequence": 1,
+    "redirectUrl": "https://example.com/promo"
+  }
+  ```
+- `PUT /api/advertisement-banner/:id` - Update an existing banner (`superAdmin` only).
+  ```json
+  {
+    "imageUrl": "https://example.com/banner-updated.png",
+    "sequence": 2
+  }
+  ```
+- `DELETE /api/advertisement-banner/:id` - Delete a banner (`superAdmin` only).
+
+**Response format for banners:**
+```json
+{
+  "id": "uuid",
+  "imageUrl": "https://example.com/banner.png",
+  "sequence": 1,
+  "redirectUrl": "https://example.com/promo",
+  "createdAt": "2026-07-23T12:00:00.000Z",
+  "updatedAt": "2026-07-23T12:00:00.000Z"
+}
+```
+
 ## Admin groups API
 
 All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Only `admin` and `superAdmin` users can manage groups. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
