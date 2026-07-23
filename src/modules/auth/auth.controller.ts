@@ -57,6 +57,19 @@ export const authController = {
     }
   },
 
+  sendRegisterOtp: async (context: Context) => {
+    try {
+      const body = await getJsonBody<{ email?: string }>(context)
+      if (!body.email) {
+        throw new AuthError('Email is required', httpStatus.badRequest)
+      }
+      const result = await authService.sendRegisterOtp(body.email)
+      return context.json(result, httpStatus.ok)
+    } catch (error) {
+      return handleAuthError(context, error)
+    }
+  },
+
   register: async (context: Context) => {
     try {
       const body = await getJsonBody<RegisterInput>(context)
@@ -120,12 +133,22 @@ export const authController = {
     }
   },
 
+  sendDeleteAccountOtp: async (context: Context) => {
+    try {
+      const result = await authService.sendDeleteAccountOtp(getBearerToken(context))
+      return context.json(result, httpStatus.ok)
+    } catch (error) {
+      return handleAuthError(context, error)
+    }
+  },
+
   deleteAccount: async (context: Context) => {
     try {
-      const body = await getJsonBody<{ confirmation?: string }>(context)
+      const body = await getJsonBody<{ confirmation?: string; otp?: string }>(context)
       const result = await authService.deleteAccount(
         getBearerToken(context),
         body.confirmation,
+        body.otp
       )
 
       return context.json(result, httpStatus.ok)

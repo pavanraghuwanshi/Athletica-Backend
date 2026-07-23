@@ -60,9 +60,13 @@ Base path: `/api/auth`
   ```txt
   Open this URL in browser: http://localhost:3000/api/auth/register
   ```
-- `POST /api/auth/register` - email/password registration
+- `POST /api/auth/register/send-otp` - send a 6-digit OTP to the email for registration
   ```json
-  { "name": "Pavan", "email": "pavan@example.com", "password": "secret123" }
+  { "email": "pavan@example.com" }
+  ```
+- `POST /api/auth/register` - email/password registration with OTP verification
+  ```json
+  { "name": "Pavan", "email": "pavan@example.com", "password": "secret123", "otp": "123456" }
   ```
 - `POST /api/auth/login` - email/password login
   ```json
@@ -94,14 +98,19 @@ Base path: `/api/auth`
   Authorization: Bearer <token>
   ```
   JWTs do not expire automatically. Logout permanently revokes the current JWT so it cannot be used again.
-- `DELETE /api/auth/account` - permanently delete the authenticated account and associated data.
+- `POST /api/auth/account/send-otp` - send a 6-digit OTP to the authenticated user's email for account deletion
+  ```http
+  POST /api/auth/account/send-otp
+  Authorization: Bearer <token>
+  ```
+- `DELETE /api/auth/account` - permanently delete the authenticated account and associated data. Requires the OTP received from the `/account/send-otp` endpoint.
   ```http
   DELETE /api/auth/account
   Authorization: Bearer <token>
   Content-Type: application/json
   ```
   ```json
-  { "confirmation": "DELETE" }
+  { "confirmation": "DELETE", "otp": "123456" }
   ```
   This permanently deletes the user, all records from their 14 health collections, every sent/received data-admin request or grant, and owned admin groups. The deleted user is also removed from other admin groups. The deleted user's JWTs stop working because the user no longer exists.
 

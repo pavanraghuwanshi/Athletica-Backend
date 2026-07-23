@@ -19,6 +19,16 @@ export type RegisterInput = {
   name?: string
   email?: string
   password?: string
+  otp?: string
+}
+
+export type SendRegisterOtpInput = {
+  email?: string
+}
+
+export type DeleteAccountInput = {
+  confirmation?: string
+  otp?: string
 }
 
 export type LoginInput = {

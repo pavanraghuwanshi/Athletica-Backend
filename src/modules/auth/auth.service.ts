@@ -16,8 +16,9 @@ import { metricStore } from '../metrics/metric.store'
 import { accessStore } from '../sharing/access.store'
 import { adminGroupStore } from '../admin-groups/admin-group.store'
 import { personInfoStore } from '../person-info/person-info.store'
-
-type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 502
+import { authOtpStore, type AuthOtpPurpose } from './auth-otp.store'
+import { sendEmail } from '../../shared/email/email.service'
+type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 429 | 502
 
 type GoogleTokenInfo = {
   aud?: string
@@ -66,6 +67,70 @@ export class AuthError extends Error {
   ) {
     super(message)
   }
+}
+
+const OTP_TTL_MS = 10 * 60 * 1000
+const OTP_HOLD_MS = 10 * 60 * 1000
+const MAX_OTP_SENDS_BEFORE_HOLD = 5
+
+const generateOtp = () => {
+  return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0')
+}
+
+const hashOtp = async (email: string, purpose: string, otp: string) => {
+  const bytes = new TextEncoder().encode(`${email}:${purpose}:${otp}:${env.jwtSecret}`)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+const getNextOtpSendState = async (email: string, purpose: AuthOtpPurpose) => {
+  const now = Date.now()
+  const otpRecord = await authOtpStore.findByEmailAndPurpose(email, purpose)
+  
+  if (otpRecord?.otpHoldUntil && otpRecord.otpHoldUntil.getTime() > now) {
+    const retryAfterSeconds = Math.ceil((otpRecord.otpHoldUntil.getTime() - now) / 1000)
+    throw new AuthError(`OTP resend limit reached; try again after ${retryAfterSeconds} seconds`, 429)
+  }
+
+  const otpSendCount = otpRecord?.otpHoldUntil ? 0 : (otpRecord?.otpSendCount ?? 0)
+  
+  if (otpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD) {
+    const otpHoldUntil = new Date(now + OTP_HOLD_MS)
+    await authOtpStore.createOrUpdate(email, purpose, {
+      otpHash: otpRecord?.otpHash ?? '',
+      otpExpiresAt: otpRecord?.otpExpiresAt ?? new Date(),
+      otpSendCount,
+      otpHoldUntil
+    })
+    throw new AuthError('OTP resend limit reached; try again after 10 minutes', 429)
+  }
+
+  const nextOtpSendCount = otpSendCount + 1
+  return {
+    otpSendCount: nextOtpSendCount,
+    otpHoldUntil: nextOtpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD ? new Date(now + OTP_HOLD_MS) : undefined,
+    message: nextOtpSendCount >= MAX_OTP_SENDS_BEFORE_HOLD
+      ? 'OTP sent. Five sends used; resends are available again after 10 minutes.'
+      : 'OTP sent. It expires in 10 minutes.',
+  }
+}
+
+const verifyAndBurnOtp = async (email: string, purpose: AuthOtpPurpose, otp: string) => {
+  const otpRecord = await authOtpStore.findByEmailAndPurpose(email, purpose)
+  if (!otpRecord) {
+    throw new AuthError('No pending OTP request found', 400)
+  }
+
+  const expectedHash = await hashOtp(email, purpose, otp)
+  if (otpRecord.otpHash !== expectedHash) {
+    throw new AuthError('Invalid OTP', 400)
+  }
+
+  if (otpRecord.otpExpiresAt.getTime() < Date.now()) {
+    throw new AuthError('OTP has expired', 400)
+  }
+
+  await authOtpStore.deleteByEmailAndPurpose(email, purpose)
 }
 
 const normalizeEmail = (email?: string) => {
@@ -388,6 +453,38 @@ const verifyAppleIdentityToken = async (identityToken?: string) => {
 }
 
 export const authService = {
+  sendRegisterOtp: async (email: string) => {
+    const normalizedEmail = normalizeEmail(email)
+    if (!validateEmail(normalizedEmail)) {
+      throw new AuthError('Valid email is required', 400)
+    }
+
+    const existingUser = await userStore.findByEmail(normalizedEmail)
+    if (existingUser && existingUser.passwordHash) {
+      throw new AuthError('Email is already registered', 409)
+    }
+
+    const state = await getNextOtpSendState(normalizedEmail, 'register')
+    const otp = generateOtp()
+    const otpHash = await hashOtp(normalizedEmail, 'register', otp)
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
+
+    await authOtpStore.createOrUpdate(normalizedEmail, 'register', {
+      otpHash,
+      otpExpiresAt,
+      otpSendCount: state.otpSendCount,
+      otpHoldUntil: state.otpHoldUntil,
+    })
+
+    await sendEmail({
+      to: normalizedEmail,
+      subject: 'Your Athhleticaa Registration OTP',
+      text: `Your OTP for registration is ${otp}. It expires in 10 minutes.`,
+    })
+
+    return { message: state.message }
+  },
+
   getGoogleAuthorizationUrl: (state?: string) => {
     return buildGoogleAuthorizationUrl(state)
   },
@@ -402,6 +499,7 @@ export const authService = {
     const email = normalizeEmail(input.email)
     const password = input.password?.trim() ?? ''
     const name = input.name?.trim() || email.split('@')[0]
+    const otp = input.otp?.trim()
 
     if (!validateEmail(email)) {
       throw new AuthError('Valid email is required', 400)
@@ -410,6 +508,12 @@ export const authService = {
     if (password.length < 6) {
       throw new AuthError('Password must be at least 6 characters', 400)
     }
+
+    if (!otp) {
+      throw new AuthError('OTP is required for registration', 400)
+    }
+
+    await verifyAndBurnOtp(email, 'register', otp)
 
     const existingUser = await userStore.findByEmail(email)
     const passwordHash = await Bun.password.hash(password)
@@ -577,12 +681,42 @@ export const authService = {
     return { message: 'Logged out successfully' }
   },
 
-  deleteAccount: async (token: string, confirmation?: string) => {
+  sendDeleteAccountOtp: async (token: string) => {
+    const user = await authService.getUserFromToken(token)
+    const email = user.email
+
+    const state = await getNextOtpSendState(email, 'delete')
+    const otp = generateOtp()
+    const otpHash = await hashOtp(email, 'delete', otp)
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS)
+
+    await authOtpStore.createOrUpdate(email, 'delete', {
+      otpHash,
+      otpExpiresAt,
+      otpSendCount: state.otpSendCount,
+      otpHoldUntil: state.otpHoldUntil,
+    })
+
+    await sendEmail({
+      to: email,
+      subject: 'Your Athhleticaa Account Deletion OTP',
+      text: `Your OTP for account deletion is ${otp}. It expires in 10 minutes. If you did not request this, please ignore this email.`,
+    })
+
+    return { message: state.message }
+  },
+
+  deleteAccount: async (token: string, confirmation?: string, otp?: string) => {
     if (confirmation !== 'DELETE') {
       throw new AuthError('Send confirmation as DELETE to permanently delete the account', 400)
     }
+    
+    if (!otp) {
+      throw new AuthError('OTP is required to delete the account', 400)
+    }
 
     const user = await authService.getUserFromToken(token)
+    await verifyAndBurnOtp(user.email, 'delete', otp)
     const [healthRecordsDeleted] = await Promise.all([
       metricStore.deleteAllByOwner(user.id),
       accessStore.deleteByUserId(user.id),
