@@ -228,6 +228,40 @@ All paths use the `/api/advertisement-banner` base.
 ```
 *(Note: For videos, the `fileUrl` will look like `/api/videos/banners/random-uuid.mp4` to support chunked streaming)*
 
+## Devices API
+
+All paths use the `/api/devices` base. These APIs manage the device inventory and user activation mapping.
+
+- `POST /api/devices/bulk-upload` - Upload a batch of unique device MAC IDs (`admin` and `superAdmin` only).
+  - Automatically sets a default warranty of 1 year (12 months) for each device.
+  - Requires a bearer token for authentication.
+  ```json
+  {
+    "macIds": [
+      "AA:BB:CC:DD:EE:01",
+      "AA:BB:CC:DD:EE:02"
+    ]
+  }
+  ```
+
+- `POST /api/devices/activate` - Register a device to the currently authenticated user when they connect it for the first time.
+  - Checks if the MAC ID exists in the database.
+  - Records the `activationTime` (if not already set).
+  - Associates the device with the authenticated `userId`.
+  - Appends the MAC ID to the `deviceMacIds` array of the user's profile.
+  ```json
+  {
+    "macId": "AA:BB:CC:DD:EE:01"
+  }
+  ```
+  **Response:**
+  ```json
+  {
+    "status": "ok",
+    "message": "device exist"
+  }
+  ```
+
 ## Admin groups API
 
 All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Only `admin` and `superAdmin` users can manage groups. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
