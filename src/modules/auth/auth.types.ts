@@ -11,6 +11,7 @@ export type User = {
   appleId?: string
   providers: AuthProvider[]
   role: UserRole
+  deviceMacIds?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -58,6 +59,7 @@ export type AuthUserResponse = {
   picture?: string
   providers: AuthProvider[]
   role: UserRole
+  deviceMacIds?: string[]
   createdAt: string
   updatedAt: string
 }

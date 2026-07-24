@@ -21,6 +21,7 @@ const getUserModel = async () => {
         appleId: { type: String, sparse: true },
         providers: { type: [String], required: true },
         role: { type: String, enum: ['user', 'admin', 'superAdmin'], required: true, default: 'user' },
+        deviceMacIds: { type: [String], default: [] },
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
       },
@@ -36,7 +37,7 @@ const getUserModel = async () => {
   return userModel
 }
 
-const toUser = (document: UserDocument | null) => {
+const toUser = (document: UserDocument | null): User | undefined => {
   const user = document?.toObject<User>({
     flattenMaps: true,
     transform: (_document, user) => {
@@ -119,4 +120,15 @@ export const userStore = {
     const UserModel = await getUserModel()
     await UserModel.deleteOne({ id })
   },
+
+  addDevice: async (id: string, macId: string) => {
+    const UserModel = await getUserModel()
+    const updatedAt = new Date().toISOString()
+    const document = await UserModel.findOneAndUpdate(
+      { id },
+      { $addToSet: { deviceMacIds: macId }, updatedAt },
+      { new: true }
+    )
+    return toUser(document)
+  }
 }

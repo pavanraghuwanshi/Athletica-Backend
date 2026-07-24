@@ -22,6 +22,7 @@ import { adminGroupRoutes } from '../modules/admin-groups/admin-group.routes'
 import { syncRoutes } from '../modules/sync/sync.routes'
 import { personInfoRoutes } from '../modules/person-info/person-info.routes'
 import { advertisementBannerRoutes } from '../modules/advertisement-banner/advertisement-banner.routes'
+import { deviceRoutes } from '../modules/devices/device.routes'
 
 export const registerRoutes = (app: Hono) => {
   app.route('/api/', healthRoutes)
@@ -46,6 +47,7 @@ export const registerRoutes = (app: Hono) => {
   app.route('/api/admin-access', accessRoutes)
   app.route('/api/admin-groups', adminGroupRoutes)
   app.route('/api/advertisement-banner', advertisementBannerRoutes)
+  app.route('/api/devices', deviceRoutes)
   
   app.get('/api/videos/banners/:filename', videoController.streamVideo)
   app.get('/api/images/banners/:filename', imageController.getImage)
