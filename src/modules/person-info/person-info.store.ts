@@ -15,6 +15,7 @@ const getPersonInfoModel = async () => {
         userId: { type: String, required: true, unique: true },
         gender: { type: String, enum: ['Male', 'Female', 'Other'], required: true },
         name: { type: String, required: true },
+        surname: { type: String, required: false },
         height: { type: Number, required: true },
         weight: { type: Number, required: true },
         age: { type: Number, required: true },

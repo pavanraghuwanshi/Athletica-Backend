@@ -2,6 +2,7 @@ export type PersonInfo = {
   userId: string
   gender: 'Male' | 'Female' | 'Other'
   name: string
+  surname?: string
   height: number
   weight: number
   age: number
@@ -12,6 +13,7 @@ export type PersonInfo = {
 export type SavePersonInfoInput = {
   gender: 'Male' | 'Female' | 'Other'
   name: string
+  surname?: string
   height: number
   weight: number
   age: number
