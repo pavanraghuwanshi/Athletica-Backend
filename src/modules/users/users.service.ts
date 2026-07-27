@@ -4,6 +4,7 @@ import type { AuthUserResponse, User } from '../auth/auth.types'
 import { accessService } from '../sharing/access.service'
 import { metricService } from '../metrics/metric.service'
 import { syncStore } from '../sync/sync.store'
+import { adminGroupStore } from '../admin-groups/admin-group.store'
 
 type VisibleUser = Pick<User, 'id' | 'name' | 'email' | 'picture' | 'role' | 'createdAt' | 'updatedAt'> & {
   accessType: 'self' | 'dataAdmin' | 'superAdmin'
@@ -32,12 +33,22 @@ export const usersService = {
     return users.map((user) => toVisibleUser(user, user.id === viewer.id ? 'self' : 'dataAdmin'))
   },
 
-  listVisiblePage: async (viewer: AuthUserResponse, query: { page?: string; limit?: string }) => {
+  listVisiblePage: async (viewer: AuthUserResponse, query: { page?: string; limit?: string; groupId?: string }) => {
     const requestedPage = Number(query.page ?? 1)
     const requestedLimit = Number(query.limit ?? 20)
     const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1
     const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20
-    const users = await usersService.listVisible(viewer)
+    let users = await usersService.listVisible(viewer)
+    
+    if (query.groupId) {
+      const group = await adminGroupStore.findById(query.groupId)
+      if (!group) {
+        throw new AuthError('Group not found', 404)
+      }
+      const memberIds = new Set(group.memberUserIds)
+      users = users.filter((user) => memberIds.has(user.id))
+    }
+
     const total = users.length
     const totalPages = Math.max(1, Math.ceil(total / limit))
     const offset = (page - 1) * limit

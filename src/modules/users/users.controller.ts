@@ -19,6 +19,7 @@ export const usersController = {
         await usersService.listVisiblePage(await getAuthenticatedUser(context), {
           page: context.req.query('page'),
           limit: context.req.query('limit'),
+          groupId: context.req.query('groupId'),
         }),
       )
     } catch (error) {
@@ -29,7 +30,7 @@ export const usersController = {
   get: async (context: Context) => {
     try {
       return context.json({
-        user: await usersService.getVisibleById(await getAuthenticatedUser(context), context.req.param('id')),
+        user: await usersService.getVisibleById(await getAuthenticatedUser(context), context.req.param('id')!),
       })
     } catch (error) {
       return handleError(context, error)
@@ -39,7 +40,7 @@ export const usersController = {
   overview: async (context: Context) => {
     try {
       return context.json(
-        await metricService.overview(await getAuthenticatedUser(context), context.req.param('id'), context.req.query('date')),
+        await metricService.overview(await getAuthenticatedUser(context), context.req.param('id')!, context.req.query('date')),
       )
     } catch (error) {
       return handleError(context, error)
