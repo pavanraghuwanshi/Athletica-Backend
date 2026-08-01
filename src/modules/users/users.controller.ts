@@ -20,6 +20,7 @@ export const usersController = {
           page: context.req.query('page'),
           limit: context.req.query('limit'),
           groupId: context.req.query('groupId'),
+          search: context.req.query('search'),
         }),
       )
     } catch (error) {

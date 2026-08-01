@@ -33,7 +33,7 @@ export const usersService = {
     return users.map((user) => toVisibleUser(user, user.id === viewer.id ? 'self' : 'dataAdmin'))
   },
 
-  listVisiblePage: async (viewer: AuthUserResponse, query: { page?: string; limit?: string; groupId?: string }) => {
+  listVisiblePage: async (viewer: AuthUserResponse, query: { page?: string; limit?: string; groupId?: string; search?: string }) => {
     const requestedPage = Number(query.page ?? 1)
     const requestedLimit = Number(query.limit ?? 20)
     const page = Number.isInteger(requestedPage) ? Math.max(requestedPage, 1) : 1
@@ -47,6 +47,14 @@ export const usersService = {
       }
       const memberIds = new Set(group.memberUserIds)
       users = users.filter((user) => memberIds.has(user.id))
+    }
+
+    if (query.search) {
+      const searchLower = query.search.toLowerCase()
+      users = users.filter((user) => 
+        (user.name?.toLowerCase().includes(searchLower)) ||
+        (user.email?.toLowerCase().includes(searchLower))
+      )
     }
 
     const total = users.length
