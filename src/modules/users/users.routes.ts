@@ -4,5 +4,6 @@ import { usersController } from './users.controller'
 export const usersRoutes = new Hono()
 
 usersRoutes.get('/', usersController.list)
+usersRoutes.delete('/', usersController.delete)
 usersRoutes.get('/:id/overview', usersController.overview)
 usersRoutes.get('/:id', usersController.get)

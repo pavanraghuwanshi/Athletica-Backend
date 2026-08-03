@@ -47,4 +47,20 @@ export const usersController = {
       return handleError(context, error)
     }
   },
+
+  delete: async (context: Context) => {
+    try {
+      const body = await context.req.json()
+
+      if (!Array.isArray(body.userIds)) {
+        return context.json({ message: 'userIds array is required' }, 400)
+      }
+
+      await usersService.delete(await getAuthenticatedUser(context), body.userIds)
+
+      return context.json({ success: true })
+    } catch (error) {
+      return handleError(context, error)
+    }
+  },
 }

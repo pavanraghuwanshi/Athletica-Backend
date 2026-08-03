@@ -113,4 +113,16 @@ export const usersService = {
 
     return uniqueUserIds
   },
+
+  delete: async (viewer: AuthUserResponse, userIds: string[]) => {
+    if (viewer.role !== 'superAdmin') {
+      throw new AuthError('Only super admin can delete users', 403)
+    }
+
+    if (userIds.includes(viewer.id)) {
+      throw new AuthError('Cannot delete yourself', 400)
+    }
+
+    await userStore.deleteByIds(userIds)
+  },
 }

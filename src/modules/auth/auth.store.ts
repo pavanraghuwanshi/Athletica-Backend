@@ -121,6 +121,11 @@ export const userStore = {
     await UserModel.deleteOne({ id })
   },
 
+  deleteByIds: async (ids: string[]) => {
+    const UserModel = await getUserModel()
+    await UserModel.deleteMany({ id: { $in: ids } })
+  },
+
   addDevice: async (id: string, macId: string) => {
     const UserModel = await getUserModel()
     const updatedAt = new Date().toISOString()
