@@ -29,4 +29,5 @@ export const env = {
   smtpPassword: (Bun.env.SMTP_PASS ?? '').replace(/\s/g, ''),
   emailFrom: Bun.env.EMAIL_FROM ?? '',
   superAdminEmail: (Bun.env.SUPER_ADMIN_EMAIL ?? '').trim().toLowerCase(),
+  externalWebhookUrl: Bun.env.EXTERNAL_WEBHOOK_URL ?? '',
 }

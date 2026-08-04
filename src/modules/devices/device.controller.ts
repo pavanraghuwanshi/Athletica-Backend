@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { getAuthenticatedUser } from '../auth/auth.guard'
 import { DeviceError, deviceService } from './device.service'
+import { webhookService } from '../webhook/webhook.service'
 
 const handleError = (context: Context, error: unknown) => {
   if (error instanceof DeviceError) {
@@ -41,8 +42,17 @@ export const deviceController = {
     try {
       const user = await getAuthenticatedUser(context)
       const body = await context.req.json()
+      const result = await deviceService.activateDevice(body.macId, user.id)
       
-      return context.json(await deviceService.activateDevice(body.macId, user.id))
+      // Fire outbound webhook asynchronously ONLY on first connect
+      if (result.isFirstTime) {
+        webhookService.fireUserWebhook(user.id)
+      }
+      
+      // Clean up response
+      delete (result as any).isFirstTime
+
+      return context.json(result)
     } catch (error) {
       return handleError(context, error)
     }

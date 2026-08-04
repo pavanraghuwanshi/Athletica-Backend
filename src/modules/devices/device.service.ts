@@ -46,15 +46,18 @@ export const deviceService = {
     // }
 
     let activationTime = device.activationTime
+    let isFirstTime = false
     
     if (!activationTime) {
       activationTime = new Date().toISOString()
       await deviceStore.activateDevice(macId, userId, activationTime)
+      isFirstTime = true
     } else {
       // Even if already activated, we might still want to add it to this user's list
       // Or maybe update the userId. For now we will update user ID if not set.
       if (!device.userId) {
         await deviceStore.activateDevice(macId, userId, activationTime)
+        isFirstTime = true
       }
     }
 
@@ -63,6 +66,7 @@ export const deviceService = {
     return {
       status: 'ok',
       message: 'device exist',
+      isFirstTime,
     }
   },
 }
