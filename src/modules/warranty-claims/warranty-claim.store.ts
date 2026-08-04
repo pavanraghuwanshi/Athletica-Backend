@@ -7,7 +7,7 @@ export interface IWarrantyClaim {
   invoiceNumber?: string
   purchasingDate?: Date
   reason?: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'replaced'
   createdAt: Date
   updatedAt: Date
 }
@@ -22,7 +22,7 @@ const warrantyClaimSchema = new mongoose.Schema<IWarrantyClaim>(
     reason: { type: String, required: false },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'replaced'],
       default: 'pending'
     },
   },
@@ -42,8 +42,13 @@ export const warrantyClaimStore = {
     return WarrantyClaim.findById(id).lean()
   },
 
-  listAll: async (filters: any = {}) => {
-    return WarrantyClaim.find(filters).sort({ createdAt: -1 }).lean()
+  listAll: async (filters: any = {}, page: number = 1, limit: number = 20) => {
+    const skip = (page - 1) * limit
+    const [claims, total] = await Promise.all([
+      WarrantyClaim.find(filters).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      WarrantyClaim.countDocuments(filters)
+    ])
+    return { claims, total }
   },
 
   update: async (id: string, data: Partial<IWarrantyClaim>) => {

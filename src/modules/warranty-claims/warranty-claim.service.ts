@@ -23,10 +23,22 @@ const saveBillFile = async (file: File): Promise<string> => {
 }
 
 export const warrantyClaimService = {
-  listAll: async (viewer: AuthUserResponse) => {
+  listAll: async (viewer: AuthUserResponse, page: number = 1, limit: number = 20) => {
     // Regular users can only see their own claims, admins can see all
     const filters = viewer.role === 'admin' || viewer.role === 'superAdmin' ? {} : { userId: viewer.id }
-    return warrantyClaimStore.listAll(filters)
+    const { claims, total } = await warrantyClaimStore.listAll(filters, page, limit)
+    
+    return {
+      claims,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      }
+    }
   },
 
   getById: async (viewer: AuthUserResponse, id: string) => {

@@ -12,5 +12,5 @@ export interface UpdateWarrantyClaimInput {
   invoiceNumber?: string
   purchasingDate?: Date
   reason?: string
-  status?: 'pending' | 'approved' | 'rejected'
+  status?: 'pending' | 'approved' | 'rejected' | 'replaced'
 }

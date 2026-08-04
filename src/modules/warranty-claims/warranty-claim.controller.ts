@@ -27,7 +27,12 @@ export const warrantyClaimController = {
   listAll: async (context: Context) => {
     try {
       const viewer = await getAuthenticatedUser(context)
-      const claims = await warrantyClaimService.listAll(viewer)
+      const pageStr = context.req.query('page')
+      const limitStr = context.req.query('limit')
+      const page = pageStr ? parseInt(pageStr, 10) : 1
+      const limit = limitStr ? parseInt(limitStr, 10) : 20
+      
+      const claims = await warrantyClaimService.listAll(viewer, page, limit)
       return context.json(claims, httpStatus.ok)
     } catch (error) {
       return handleError(context, error)

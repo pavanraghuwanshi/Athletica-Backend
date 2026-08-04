@@ -266,9 +266,10 @@ All paths use the `/api/devices` base. These APIs manage the device inventory an
 
 All paths use the `/api/warranty-claims` base and require a bearer token. These APIs manage the manual warranty claim feature.
 
-- `GET /api/warranty-claims` - List warranty claims.
+- `GET /api/warranty-claims?page=1&limit=20` - List warranty claims with pagination.
   - Regular users can only see their own claims.
   - Admins and superAdmins can see all claims.
+  - `limit` defaults to 20.
 - `GET /api/warranty-claims/:id` - Get a specific warranty claim by ID.
 - `POST /api/warranty-claims` - Submit a new manual warranty claim.
   ```http
@@ -293,24 +294,36 @@ All paths use the `/api/warranty-claims` base and require a bearer token. These 
   - `invoiceNumber`: (String) Updated invoice number.
   - `purchasingDate`: (Date String) Updated purchasing date.
   - `reason`: (String) Updated reason.
-  - `status`: (String) Updated status (`pending`, `approved`, `rejected`). Only `admin` and `superAdmin` can update the status.
+  - `status`: (String) Updated status (`pending`, `approved`, `rejected`, `replaced`). Only `admin` and `superAdmin` can update the status.
 
 - `DELETE /api/warranty-claims/:id` - Delete a warranty claim. (Only owner, admin, or superAdmin can delete).
 - `GET /api/warranty-claims/images/:filename` - Stream the uploaded bill image/file (Public, no token required).
 
-**Response format for warranty claims:**
+**Response format for warranty claims list:**
 ```json
 {
-  "_id": "60d5ecb74d6bb892b0c3a5b9",
-  "userId": "user-id-123",
-  "billUrl": "/api/warranty-claims/images/random-uuid.png",
-  "name": "Pavan",
-  "invoiceNumber": "INV-123456",
-  "purchasingDate": "2026-07-10T00:00:00.000Z",
-  "reason": "Device stopped turning on",
-  "status": "pending",
-  "createdAt": "2026-07-23T12:00:00.000Z",
-  "updatedAt": "2026-07-23T12:00:00.000Z"
+  "claims": [
+    {
+      "_id": "60d5ecb74d6bb892b0c3a5b9",
+      "userId": "user-id-123",
+      "billUrl": "/api/warranty-claims/images/random-uuid.png",
+      "name": "Pavan",
+      "invoiceNumber": "INV-123456",
+      "purchasingDate": "2026-07-10T00:00:00.000Z",
+      "reason": "Device stopped turning on",
+      "status": "pending",
+      "createdAt": "2026-07-23T12:00:00.000Z",
+      "updatedAt": "2026-07-23T12:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  }
 }
 ```
 
