@@ -262,8 +262,59 @@ All paths use the `/api/devices` base. These APIs manage the device inventory an
   }
   ```
 
-## Admin groups API
+## Warranty Claims API
 
+All paths use the `/api/warranty-claims` base and require a bearer token. These APIs manage the manual warranty claim feature.
+
+- `GET /api/warranty-claims` - List warranty claims.
+  - Regular users can only see their own claims.
+  - Admins and superAdmins can see all claims.
+- `GET /api/warranty-claims/:id` - Get a specific warranty claim by ID.
+- `POST /api/warranty-claims` - Submit a new manual warranty claim.
+  ```http
+  POST /api/warranty-claims
+  Content-Type: multipart/form-data
+  ```
+  **Form Fields:**
+  - `bill`: (File, Required) The bill/invoice image or document.
+  - `name`: (String, Optional) Name of the claimant.
+  - `invoiceNumber`: (String, Optional) Invoice number.
+  - `purchasingDate`: (Date String, Optional) Date of purchase (e.g., `2026-07-10`).
+  - `reason`: (String, Optional) Reason for the claim.
+
+- `PUT /api/warranty-claims/:id` - Update an existing claim.
+  ```http
+  PUT /api/warranty-claims/:id
+  Content-Type: multipart/form-data
+  ```
+  **Form Fields (All Optional):**
+  - `bill`: (File) The new bill file.
+  - `name`: (String) Updated name.
+  - `invoiceNumber`: (String) Updated invoice number.
+  - `purchasingDate`: (Date String) Updated purchasing date.
+  - `reason`: (String) Updated reason.
+  - `status`: (String) Updated status (`pending`, `approved`, `rejected`). Only `admin` and `superAdmin` can update the status.
+
+- `DELETE /api/warranty-claims/:id` - Delete a warranty claim. (Only owner, admin, or superAdmin can delete).
+- `GET /api/warranty-claims/images/:filename` - Stream the uploaded bill image/file (Public, no token required).
+
+**Response format for warranty claims:**
+```json
+{
+  "_id": "60d5ecb74d6bb892b0c3a5b9",
+  "userId": "user-id-123",
+  "billUrl": "/api/warranty-claims/images/random-uuid.png",
+  "name": "Pavan",
+  "invoiceNumber": "INV-123456",
+  "purchasingDate": "2026-07-10T00:00:00.000Z",
+  "reason": "Device stopped turning on",
+  "status": "pending",
+  "createdAt": "2026-07-23T12:00:00.000Z",
+  "updatedAt": "2026-07-23T12:00:00.000Z"
+}
+```
+
+## Admin groups API
 All paths use the `/api/admin-groups` base and require a bearer token. Groups are owned by the authenticated admin account. Only `admin` and `superAdmin` users can manage groups. Regular admins can only add themselves and OTP-connected users as members; `superAdmin` can add any user.
 
 - `POST /api/admin-groups` - create a group.
