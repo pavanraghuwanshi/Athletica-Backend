@@ -6,7 +6,7 @@ import { metricService } from '../metrics/metric.service'
 import { syncStore } from '../sync/sync.store'
 import { adminGroupStore } from '../admin-groups/admin-group.store'
 
-type VisibleUser = Pick<User, 'id' | 'name' | 'email' | 'picture' | 'role' | 'createdAt' | 'updatedAt'> & {
+type VisibleUser = Pick<User, 'id' | 'name' | 'email' | 'picture' | 'role' | 'referralCode' | 'points' | 'createdAt' | 'updatedAt'> & {
   accessType: 'self' | 'dataAdmin' | 'superAdmin'
 }
 
@@ -16,6 +16,8 @@ const toVisibleUser = (user: User, accessType: VisibleUser['accessType']): Visib
   email: user.email,
   picture: user.picture,
   role: user.role,
+  referralCode: user.referralCode,
+  points: user.points ?? 0,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
   accessType,

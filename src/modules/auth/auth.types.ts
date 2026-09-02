@@ -12,6 +12,9 @@ export type User = {
   providers: AuthProvider[]
   role: UserRole
   deviceMacIds?: string[]
+  referralCode?: string
+  referredBy?: string
+  points: number
   createdAt: string
   updatedAt: string
 }
@@ -21,6 +24,7 @@ export type RegisterInput = {
   email?: string
   password?: string
   otp?: string
+  referredBy?: string
 }
 
 export type SendRegisterOtpInput = {
@@ -60,6 +64,8 @@ export type AuthUserResponse = {
   providers: AuthProvider[]
   role: UserRole
   deviceMacIds?: string[]
+  referralCode?: string
+  points: number
   createdAt: string
   updatedAt: string
 }

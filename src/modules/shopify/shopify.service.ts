@@ -1,0 +1,100 @@
+import { env } from '../../config/env'
+import mongoose from 'mongoose'
+import { systemSettingsStore } from '../system-settings/system-settings.store'
+
+export const shopifyService = {
+  createDiscountCode: async (code: string) => {
+    try {
+      const shopifyDomain = process.env.SHOPIFY_DOMAIN
+      const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN
+      
+      if (!shopifyDomain || !shopifyAccessToken) {
+        console.warn('Shopify API credentials not configured. Skipping discount code creation.')
+        return
+      }
+
+      const settings = await systemSettingsStore.getReferralSettings()
+      
+      const priceRuleData = {
+        price_rule: {
+          title: `Referral - ${code}`,
+          target_type: 'line_item',
+          target_selection: 'all',
+          allocation_method: 'across',
+          value_type: 'percentage',
+          value: `-${settings.discountPercentage.toFixed(1)}`, // Dynamic discount
+          customer_selection: 'all',
+          starts_at: new Date().toISOString()
+        }
+      }
+
+      const priceRuleRes = await fetch(`https://${shopifyDomain}/admin/api/2024-01/price_rules.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': shopifyAccessToken
+        },
+        body: JSON.stringify(priceRuleData)
+      })
+
+      if (!priceRuleRes.ok) {
+        throw new Error(`Failed to create PriceRule: ${await priceRuleRes.text()}`)
+      }
+
+      const priceRule = await priceRuleRes.json()
+
+      const discountCodeData = {
+        discount_code: {
+          code: code
+        }
+      }
+
+      const discountRes = await fetch(`https://${shopifyDomain}/admin/api/2024-01/price_rules/${priceRule.price_rule.id}/discount_codes.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': shopifyAccessToken
+        },
+        body: JSON.stringify(discountCodeData)
+      })
+
+      if (!discountRes.ok) {
+        throw new Error(`Failed to create Discount Code: ${await discountRes.text()}`)
+      }
+
+      console.log(`Successfully created Shopify discount code: ${code}`)
+    } catch (error) {
+      console.error('Error creating Shopify discount code:', error)
+    }
+  },
+
+  handleOrderCreated: async (orderPayload: any) => {
+    try {
+      if (!orderPayload || !orderPayload.discount_codes) {
+        return
+      }
+
+      for (const discount of orderPayload.discount_codes) {
+        const code = discount.code
+        if (code && code.startsWith('ATH-')) {
+          const UserModel = mongoose.models.User
+          if (!UserModel) {
+            console.error('User model not found')
+            return
+          }
+          const referrer = await UserModel.findOne({ referralCode: code })
+          
+          if (referrer) {
+            const settings = await systemSettingsStore.getReferralSettings()
+            const rewardPoints = settings.referralReward
+            referrer.points = (referrer.points || 0) + rewardPoints
+            await referrer.save()
+            console.log(`Rewarded ${rewardPoints} points to referrer ${referrer.id} for order ${orderPayload.id}`)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing Shopify order:', error)
+    }
+  }
+}

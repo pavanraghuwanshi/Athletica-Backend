@@ -142,6 +142,8 @@ GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 FRONTEND_AUTH_REDIRECT_URL=http://localhost:5173/auth/callback
 SUPER_ADMIN_EMAIL=superadmin@example.com
+SHOPIFY_DOMAIN=4r808y-sd.myshopify.com
+SHOPIFY_ACCESS_TOKEN=2ea427f06d922ecb16d4af8ec360c3a2ca57810087666ae7b070b3d22566b692
 ```
 
 Only the exact email in `SUPER_ADMIN_EMAIL` receives the global `superAdmin` role. Every other account starts with the `user` role. When a user verifies another user's OTP access request, the requester is promoted to the `admin` role and can connect multiple users.
@@ -338,6 +340,20 @@ All paths use the `/api/admin-groups` base and require a bearer token. Groups ar
 - `GET /api/admin-groups/:id` - get one owned group.
 - `PATCH /api/admin-groups/:id` - update `name`, `sport`, or `memberUserIds`.
 - `DELETE /api/admin-groups/:id` - delete one owned group.
+
+## Shopify Integration API
+
+The system integrates with your Shopify store to handle referrals and points automatically.
+
+When a user registers (via Email, Google, or Apple), the following occurs:
+1. They receive a **first-time signup bonus of 50 points**.
+2. A unique **Referral Code** is generated for them (e.g., `ATH-PAVAN-1234`).
+3. A **Shopify Discount Code** matching their referral code is created automatically in your Shopify admin via the Shopify API.
+
+**To handle purchase rewards:**
+- Configure a Shopify Webhook for **Order Creation** (`orders/create`) pointing to:
+  `POST /api/shopify/webhook`
+- When an order is created on your store using a user's referral code, this endpoint receives the payload and adds **100 reward points** to the referrer's account.
 
 ## Band Pro health APIs
 

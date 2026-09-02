@@ -18,6 +18,8 @@ import { adminGroupStore } from '../admin-groups/admin-group.store'
 import { personInfoStore } from '../person-info/person-info.store'
 import { authOtpStore, type AuthOtpPurpose } from './auth-otp.store'
 import { sendEmail } from '../../shared/email/email.service'
+import { shopifyService } from '../shopify/shopify.service'
+import { systemSettingsStore } from '../system-settings/system-settings.store'
 type AuthErrorStatusCode = 400 | 401 | 403 | 404 | 409 | 429 | 502
 
 type GoogleTokenInfo = {
@@ -75,6 +77,12 @@ const MAX_OTP_SENDS_BEFORE_HOLD = 5
 
 const generateOtp = () => {
   return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0')
+}
+
+const generateReferralCode = (name: string) => {
+  const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 5).toUpperCase()
+  const randomChars = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0')
+  return `ATH-${cleanName}-${randomChars}`
 }
 
 const hashOtp = async (email: string, purpose: string, otp: string) => {
@@ -140,7 +148,6 @@ const normalizeEmail = (email?: string) => {
 const validateEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
-
 const toUserResponse = (user: User): AuthUserResponse => {
   return {
     id: user.id,
@@ -149,6 +156,8 @@ const toUserResponse = (user: User): AuthUserResponse => {
     picture: user.picture,
     providers: user.providers,
     role: user.role ?? 'user',
+    referralCode: user.referralCode,
+    points: user.points ?? 0,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   }
@@ -533,6 +542,10 @@ export const authService = {
       return createAuthResponse(await userStore.save(existingUser))
     }
 
+    const referralCode = generateReferralCode(name)
+    const settings = await systemSettingsStore.getReferralSettings()
+    const points = settings.signupBonus // Dynamic signup bonus
+
     const user = await userStore.save({
       id: crypto.randomUUID(),
       name,
@@ -540,9 +553,15 @@ export const authService = {
       passwordHash,
       providers: ['email'],
       role: getRoleForEmail(email),
+      referralCode,
+      referredBy: input.referredBy,
+      points,
       createdAt: now,
       updatedAt: now,
     })
+
+    // Create Shopify discount code in the background
+    shopifyService.createDiscountCode(referralCode).catch(console.error)
 
     return createAuthResponse(user)
   },
@@ -596,6 +615,10 @@ export const authService = {
       return createAuthResponse(await userStore.save(existingUser))
     }
 
+    const referralCode = generateReferralCode(name)
+    const settings = await systemSettingsStore.getReferralSettings()
+    const points = settings.signupBonus // Dynamic signup bonus
+
     const user = await userStore.save({
       id: crypto.randomUUID(),
       name,
@@ -604,9 +627,14 @@ export const authService = {
       picture,
       providers: ['google'],
       role: getRoleForEmail(email),
+      referralCode,
+      points,
       createdAt: now,
       updatedAt: now,
     })
+
+    // Create Shopify discount code in the background
+    shopifyService.createDiscountCode(referralCode).catch(console.error)
 
     return createAuthResponse(user)
   },
@@ -643,16 +671,26 @@ export const authService = {
       return createAuthResponse(await userStore.save(existingEmailUser))
     }
 
+    const userName = name || email.split('@')[0]
+    const referralCode = generateReferralCode(userName)
+    const settings = await systemSettingsStore.getReferralSettings()
+    const points = settings.signupBonus // Dynamic signup bonus
+
     const user = await userStore.save({
       id: crypto.randomUUID(),
-      name: name || email.split('@')[0],
+      name: userName,
       email,
       appleId,
       providers: ['apple'],
       role: getRoleForEmail(email),
+      referralCode,
+      points,
       createdAt: now,
       updatedAt: now,
     })
+    
+    // Create Shopify discount code in the background
+    shopifyService.createDiscountCode(referralCode).catch(console.error)
 
     return createAuthResponse(user)
   },

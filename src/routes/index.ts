@@ -24,6 +24,8 @@ import { personInfoRoutes } from '../modules/person-info/person-info.routes'
 import { advertisementBannerRoutes } from '../modules/advertisement-banner/advertisement-banner.routes'
 import { deviceRoutes } from '../modules/devices/device.routes'
 import { warrantyClaimRoutes } from '../modules/warranty-claims/warranty-claim.routes'
+import { shopifyRouter } from '../modules/shopify/shopify.routes'
+import { systemSettingsRoutes } from '../modules/system-settings/system-settings.routes'
 
 export const registerRoutes = (app: Hono) => {
   app.route('/api/', healthRoutes)
@@ -50,6 +52,8 @@ export const registerRoutes = (app: Hono) => {
   app.route('/api/advertisement-banner', advertisementBannerRoutes)
   app.route('/api/devices', deviceRoutes)
   app.route('/api/warranty-claims', warrantyClaimRoutes)
+  app.route('/api/shopify', shopifyRouter)
+  app.route('/api/system-settings', systemSettingsRoutes)
   
   app.get('/api/videos/banners/:filename', videoController.streamVideo)
   app.get('/api/images/banners/:filename', imageController.getImage)
