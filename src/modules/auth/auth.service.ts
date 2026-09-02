@@ -180,7 +180,24 @@ const addProvider = (providers: AuthProvider[], provider: AuthProvider) => {
   return providers.includes(provider) ? providers : [...providers, provider]
 }
 
+const ensureReferralCode = async (user: User) => {
+  if (!user.referralCode) {
+    const userName = user.name || user.email.split('@')[0]
+    user.referralCode = generateReferralCode(userName)
+    
+    const settings = await systemSettingsStore.getReferralSettings()
+    if (user.points === undefined || user.points === null) {
+      user.points = settings.signupBonus
+    }
+    
+    user = await userStore.save(user)
+    shopifyService.createDiscountCode(user.referralCode!).catch(console.error)
+  }
+  return user
+}
+
 const createAuthResponse = async (user: User) => {
+  user = await ensureReferralCode(user)
   const personInfo = await personInfoStore.getByUserId(user.id)
   return {
     user: toUserResponse(user),
@@ -703,11 +720,13 @@ export const authService = {
     }
 
     const { userId } = await getVerifiedTokenPayload(token)
-    const user = await userStore.findById(userId)
+    let user = await userStore.findById(userId)
 
     if (!user) {
       throw new AuthError('User not found', 404)
     }
+
+    user = await ensureReferralCode(user)
 
     return toUserResponse(user)
   },
