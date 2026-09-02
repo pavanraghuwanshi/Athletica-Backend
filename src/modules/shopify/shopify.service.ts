@@ -2,11 +2,57 @@ import { env } from '../../config/env'
 import mongoose from 'mongoose'
 import { systemSettingsStore } from '../system-settings/system-settings.store'
 
+let cachedToken: string | null = null;
+let tokenExpiryTime: number | null = null;
+
+async function getShopifyAccessToken(): Promise<string | null> {
+  // Check if we have a valid cached token (give a 5 minute buffer)
+  if (cachedToken && tokenExpiryTime && Date.now() < tokenExpiryTime - 5 * 60 * 1000) {
+    return cachedToken;
+  }
+
+  const shopifyDomain = process.env.SHOPIFY_DOMAIN;
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+
+  if (!shopifyDomain || !clientId || !clientSecret) {
+    console.warn('Shopify API credentials (DOMAIN, CLIENT_ID, CLIENT_SECRET) not fully configured.');
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://${shopifyDomain}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Shopify access token: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    cachedToken = data.access_token;
+    // data.expires_in is in seconds, convert to milliseconds
+    tokenExpiryTime = Date.now() + (data.expires_in * 1000); 
+    return cachedToken;
+  } catch (error) {
+    console.error('Error fetching Shopify access token:', error);
+    return null;
+  }
+}
+
 export const shopifyService = {
   createDiscountCode: async (code: string) => {
     try {
       const shopifyDomain = process.env.SHOPIFY_DOMAIN
-      const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN
+      const shopifyAccessToken = await getShopifyAccessToken()
       
       if (!shopifyDomain || !shopifyAccessToken) {
         console.warn('Shopify API credentials not configured. Skipping discount code creation.')
