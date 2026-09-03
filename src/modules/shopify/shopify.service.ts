@@ -61,54 +61,69 @@ export const shopifyService = {
 
       const settings = await systemSettingsStore.getReferralSettings()
       
-      const priceRuleData = {
-        price_rule: {
-          title: `Referral - ${code}`,
-          target_type: 'line_item',
-          target_selection: 'all',
-          allocation_method: 'across',
-          value_type: 'percentage',
-          value: `-${settings.discountPercentage.toFixed(1)}`, // Dynamic discount
-          customer_selection: 'all',
-          starts_at: new Date().toISOString()
+      const graphqlQuery = {
+        query: `mutation CreateDiscount($basicCodeDiscount: DiscountCodeBasicInput!) {
+          discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+            codeDiscountNode {
+              id
+              codeDiscount {
+                ... on DiscountCodeBasic {
+                  title
+                  codes(first: 1) {
+                    nodes {
+                      code
+                    }
+                  }
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }`,
+        variables: {
+          basicCodeDiscount: {
+            title: `Referral - ${code}`,
+            code: code,
+            startsAt: new Date().toISOString(),
+            customerGets: {
+              value: {
+                // GraphQL expects percentage as a float between 0.0 and 1.0 (e.g., 0.1 for 10%)
+                percentage: settings.discountPercentage / 100
+              },
+              items: {
+                all: true
+              }
+            }
+          }
         }
       }
 
-      const priceRuleRes = await fetch(`https://${shopifyDomain}/admin/api/2024-01/price_rules.json`, {
+      const response = await fetch(`https://${shopifyDomain}/admin/api/2026-04/graphql.json`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Shopify-Access-Token': shopifyAccessToken
         },
-        body: JSON.stringify(priceRuleData)
+        body: JSON.stringify(graphqlQuery)
       })
 
-      if (!priceRuleRes.ok) {
-        throw new Error(`Failed to create PriceRule: ${await priceRuleRes.text()}`)
+      if (!response.ok) {
+        throw new Error(`Failed to create Discount Code via GraphQL: ${await response.text()}`)
       }
 
-      const priceRule = await priceRuleRes.json()
-
-      const discountCodeData = {
-        discount_code: {
-          code: code
-        }
+      const responseData = await response.json()
+      
+      if (responseData.data?.discountCodeBasicCreate?.userErrors?.length > 0) {
+        const errors = responseData.data.discountCodeBasicCreate.userErrors
+          .map((err: any) => `${err.field}: ${err.message}`)
+          .join(', ')
+        throw new Error(`Shopify GraphQL userErrors: ${errors}`)
       }
 
-      const discountRes = await fetch(`https://${shopifyDomain}/admin/api/2024-01/price_rules/${priceRule.price_rule.id}/discount_codes.json`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': shopifyAccessToken
-        },
-        body: JSON.stringify(discountCodeData)
-      })
-
-      if (!discountRes.ok) {
-        throw new Error(`Failed to create Discount Code: ${await discountRes.text()}`)
-      }
-
-      console.log(`Successfully created Shopify discount code: ${code}`)
+      console.log(`Successfully created Shopify discount code via GraphQL: ${code}`)
     } catch (error) {
       console.error('Error creating Shopify discount code:', error)
     }
