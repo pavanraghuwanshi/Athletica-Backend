@@ -6,6 +6,11 @@ let cachedToken: string | null = null;
 let tokenExpiryTime: number | null = null;
 
 async function getShopifyAccessToken(): Promise<string | null> {
+  // If a permanent Custom App Admin token is provided, use it directly (no OAuth needed)
+  if (process.env.SHOPIFY_ACCESS_TOKEN) {
+    return process.env.SHOPIFY_ACCESS_TOKEN;
+  }
+
   // Check if we have a valid cached token (give a 5 minute buffer)
   if (cachedToken && tokenExpiryTime && Date.now() < tokenExpiryTime - 5 * 60 * 1000) {
     return cachedToken;
@@ -88,6 +93,10 @@ export const shopifyService = {
             title: `Referral - ${code}`,
             code: code,
             startsAt: new Date().toISOString(),
+            customerSelection: {
+              all: true
+            },
+            appliesOncePerCustomer: false,
             customerGets: {
               value: {
                 // GraphQL expects percentage as a float between 0.0 and 1.0 (e.g., 0.1 for 10%)
